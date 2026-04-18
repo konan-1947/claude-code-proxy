@@ -54,6 +54,8 @@ async function maybeRotate(): Promise<void> {
         stream = undefined
       }
       await rename(file, rotated).catch(() => {})
+    } catch {
+      // Never propagate rotation errors — logging must never crash the proxy.
     } finally {
       rotating = undefined
     }
@@ -94,7 +96,7 @@ async function write(level: Level, service: string, msg: string, fields?: Record
   try {
     const s = await ensureStream()
     s.write(line + "\n")
-    void maybeRotate()
+    maybeRotate().catch(() => {})
   } catch {
     // swallow; also print to stderr for visibility
   }
