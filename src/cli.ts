@@ -31,14 +31,14 @@ async function main() {
         const saved = await persistInitialTokens(tokens)
         console.log(`Auth saved to ${authPath()}`)
         if (saved.accountId) console.log(`Account: ${saved.accountId}`)
-        return
+        process.exit(0)
       }
       if (sub === "device") {
         const tokens = await runDeviceLogin()
         const saved = await persistInitialTokens(tokens)
         console.log(`Auth saved to ${authPath()}`)
         if (saved.accountId) console.log(`Account: ${saved.accountId}`)
-        return
+        process.exit(0)
       }
       if (sub === "status") {
         const auth = await loadAuth()

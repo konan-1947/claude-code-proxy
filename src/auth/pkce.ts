@@ -70,6 +70,11 @@ export async function runBrowserLogin(): Promise<TokenResponse> {
   const authUrl = buildAuthorizeUrl(pkce, state)
 
   return new Promise<TokenResponse>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout)
+      server.close()
+      server.closeAllConnections?.()
+    }
     const server = createServer((req, res) => {
       const url = new URL(req.url || "/", `http://localhost:${OAUTH_PORT}`)
       if (url.pathname !== "/auth/callback") {
@@ -84,21 +89,23 @@ export async function runBrowserLogin(): Promise<TokenResponse> {
         const msg = error || "Invalid callback"
         res.writeHead(400, { "Content-Type": "text/plain" })
         res.end(`Auth failed: ${msg}`)
-        server.close()
+        cleanup()
         reject(new Error(msg))
         return
       }
       exchangeCodeForTokens(code, pkce)
         .then((tokens) => {
           res.writeHead(200, { "Content-Type": "text/html" })
-          res.end("<html><body><h1>Authorization Successful</h1><p>You can close this window.</p></body></html>")
-          server.close()
+          res.end(
+            "<html><body><h1>Authorization Successful</h1><p>You can close this window.</p></body></html>",
+          )
+          cleanup()
           resolve(tokens)
         })
         .catch((err) => {
           res.writeHead(500, { "Content-Type": "text/plain" })
           res.end(String(err))
-          server.close()
+          cleanup()
           reject(err)
         })
     })
@@ -106,9 +113,9 @@ export async function runBrowserLogin(): Promise<TokenResponse> {
       console.log(`Open this URL in your browser to authorize:\n\n  ${authUrl}\n`)
     })
     server.on("error", reject)
-    setTimeout(
+    const timeout = setTimeout(
       () => {
-        server.close()
+        cleanup()
         reject(new Error("OAuth timeout"))
       },
       5 * 60 * 1000,
