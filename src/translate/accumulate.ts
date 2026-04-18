@@ -1,5 +1,16 @@
 import { parseSseStream } from "./sse.ts"
 
+export class UpstreamStreamError extends Error {
+  constructor(
+    public kind: "rate_limit" | "failed",
+    message: string,
+    public retryAfterSeconds?: number,
+  ) {
+    super(message)
+    this.name = "UpstreamStreamError"
+  }
+}
+
 export interface AnthropicNonStreamResponse {
   id: string
   type: "message"
@@ -50,6 +61,20 @@ export async function accumulateResponse(
       continue
     }
     const t = p.type || evt.event || ""
+    if (t === "codex.rate_limits") {
+      if (p.rate_limits?.limit_reached) {
+        throw new UpstreamStreamError(
+          "rate_limit",
+          "rate limit reached",
+          p.rate_limits?.primary?.reset_after_seconds,
+        )
+      }
+      continue
+    }
+    if (t === "response.failed" || t === "response.error" || t === "error") {
+      const message = p?.response?.error?.message || p?.error?.message || "Upstream error"
+      throw new UpstreamStreamError("failed", message)
+    }
     if (t === "response.output_item.added") {
       const item = p.item
       const oi = p.output_index

@@ -3,7 +3,7 @@ import type { AnthropicRequest } from "./anthropic/schema.ts"
 import { assertAllowedModel, ModelNotAllowedError } from "./translate/model-allowlist.ts"
 import { translateRequest } from "./translate/request.ts"
 import { translateStream } from "./translate/stream.ts"
-import { accumulateResponse } from "./translate/accumulate.ts"
+import { accumulateResponse, UpstreamStreamError } from "./translate/accumulate.ts"
 import { CodexError, postCodex } from "./codex/client.ts"
 import { countTokens } from "./count-tokens.ts"
 
@@ -142,10 +142,33 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
     })
   }
 
-  const result = await accumulateResponse(upstream.body, { messageId, model: body.model })
-  return new Response(JSON.stringify(result), {
-    headers: { "content-type": "application/json" },
-  })
+  try {
+    const result = await accumulateResponse(upstream.body, { messageId, model: body.model })
+    return new Response(JSON.stringify(result), {
+      headers: { "content-type": "application/json" },
+    })
+  } catch (err) {
+    if (err instanceof UpstreamStreamError) {
+      log.warn("upstream stream error (non-streaming)", {
+        reqId,
+        kind: err.kind,
+        message: err.message,
+      })
+      if (err.kind === "rate_limit") {
+        const headers: Record<string, string> = { "content-type": "application/json" }
+        if (err.retryAfterSeconds) headers["retry-after"] = String(err.retryAfterSeconds)
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "rate_limit_error", message: err.message },
+          }),
+          { status: 429, headers },
+        )
+      }
+      return jsonError(502, "api_error", err.message)
+    }
+    throw err
+  }
 }
 
 function jsonError(status: number, type: string, message: string): Response {
