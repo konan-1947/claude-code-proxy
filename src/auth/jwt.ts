@@ -5,6 +5,7 @@ export interface IdTokenClaims {
   "https://api.openai.com/auth"?: {
     chatgpt_account_id?: string
   }
+  "https://api.openai.com/auth.chatgpt_account_id"?: string
 }
 
 export function parseJwtClaims(token: string): IdTokenClaims | undefined {
@@ -21,6 +22,7 @@ export function extractAccountIdFromClaims(claims: IdTokenClaims): string | unde
   return (
     claims.chatgpt_account_id ||
     claims["https://api.openai.com/auth"]?.chatgpt_account_id ||
+    claims["https://api.openai.com/auth.chatgpt_account_id"] ||
     claims.organizations?.[0]?.id
   )
 }
