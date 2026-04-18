@@ -230,12 +230,18 @@ async function runStream(
       const state = blocksByIndex.get(outputIndex)
       if (!state) continue
       if (state.kind === "tool") {
-        if (!state.hadDelta && typeof item.arguments === "string" && item.arguments.length) {
-          emit("content_block_delta", {
-            type: "content_block_delta",
-            index: state.index,
-            delta: { type: "input_json_delta", partial_json: item.arguments },
-          })
+        if (!state.hadDelta) {
+          const finalArgs =
+            (typeof item.arguments === "string" && item.arguments.length
+              ? item.arguments
+              : state.argsAccum) || ""
+          if (finalArgs.length) {
+            emit("content_block_delta", {
+              type: "content_block_delta",
+              index: state.index,
+              delta: { type: "input_json_delta", partial_json: finalArgs },
+            })
+          }
         }
       }
       emit("content_block_stop", { type: "content_block_stop", index: state.index })
