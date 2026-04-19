@@ -9,7 +9,6 @@ import { countTokens, countTranslatedTokens } from "./count-tokens.ts"
 
 const log = createLogger("server")
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
-const LOG_COMPACTION = !!process.env.CCP_LOG_COMPACTION
 
 export interface ServeOptions {
   port: number
@@ -53,7 +52,7 @@ async function route(req: Request, url: URL, reqId: string): Promise<Response> {
     const body = (await req.json()) as AnthropicRequest
     const tokens = countTokens(body)
     log.debug("count_tokens", { reqId, tokens })
-    if (LOG_COMPACTION) {
+    if (VERBOSE) {
       log.info("compaction telemetry", {
         reqId,
         path: url.pathname,
@@ -114,8 +113,8 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
   }
 
   const translated = translateRequest({ ...body, model: resolvedModel }, { sessionId })
-  const localInputTokens = LOG_COMPACTION ? countTokens(body) : undefined
-  const translatedInputTokens = LOG_COMPACTION ? countTranslatedTokens(translated) : undefined
+  const localInputTokens = VERBOSE ? countTokens(body) : undefined
+  const translatedInputTokens = VERBOSE ? countTranslatedTokens(translated) : undefined
   log.debug("translated request", {
     reqId,
     requestedModel: body.model,
@@ -126,7 +125,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
     promptCacheKey: translated.prompt_cache_key,
   })
   if (VERBOSE) log.debug("translated request body", { reqId, body: translated })
-  if (LOG_COMPACTION) {
+  if (VERBOSE) {
     log.info("compaction telemetry", {
       reqId,
       phase: "translated_request",
@@ -171,7 +170,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
       model: body.model,
       reqId,
       sessionId,
-      onFinish: LOG_COMPACTION
+      onFinish: VERBOSE
         ? (finish) => {
             log.info("compaction telemetry", {
               reqId,
@@ -202,7 +201,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
 
   try {
     const result = await accumulateResponse(upstream.body, { messageId, model: body.model })
-    if (LOG_COMPACTION) {
+    if (VERBOSE) {
       log.info("compaction telemetry", {
         reqId,
         phase: "upstream_finish",
