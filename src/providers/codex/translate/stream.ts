@@ -27,6 +27,7 @@ export function translateStream(
       }
       const activeTools = new Map<number, { id: string; name: string }>()
       let messageStarted = false
+      let nextIndex = 0
       const ensureMessageStart = () => {
         if (messageStarted) return
         messageStarted = true
@@ -55,6 +56,7 @@ export function translateStream(
         for await (const e of reduceUpstream(upstream, opts.log)) {
           switch (e.kind) {
             case "text-start":
+              nextIndex = Math.max(nextIndex, e.index + 1)
               ensureMessageStart()
               emit("content_block_start", {
                 type: "content_block_start",
@@ -73,6 +75,7 @@ export function translateStream(
               emit("content_block_stop", { type: "content_block_stop", index: e.index })
               break
             case "tool-start":
+              nextIndex = Math.max(nextIndex, e.index + 1)
               activeTools.set(e.index, { id: e.id, name: e.name })
               ensureMessageStart()
               emit("content_block_start", {
@@ -112,6 +115,32 @@ export function translateStream(
       } catch (err) {
         const activeToolNames = Array.from(activeTools.values(), (tool) => tool.name)
         const activeToolCalls = Array.from(activeTools.values())
+
+        const emitErrorAsText = (message: string) => {
+          ensureMessageStart()
+          for (const [idx] of activeTools) {
+            emit("content_block_stop", { type: "content_block_stop", index: idx })
+          }
+          const idx = nextIndex
+          emit("content_block_start", {
+            type: "content_block_start",
+            index: idx,
+            content_block: { type: "text", text: "" },
+          })
+          emit("content_block_delta", {
+            type: "content_block_delta",
+            index: idx,
+            delta: { type: "text_delta", text: message },
+          })
+          emit("content_block_stop", { type: "content_block_stop", index: idx })
+          emit("message_delta", {
+            type: "message_delta",
+            delta: { stop_reason: "end_turn", stop_sequence: null },
+            usage: { output_tokens: 0 },
+          })
+          emit("message_stop", { type: "message_stop" })
+        }
+
         if (err instanceof UpstreamStreamError) {
           opts.log.warn("upstream stream error", {
             kind: err.kind,
@@ -119,25 +148,14 @@ export function translateStream(
             activeToolNames,
             activeToolCalls,
           })
-          ensureMessageStart()
-          emit("error", {
-            type: "error",
-            error: {
-              type: err.kind === "rate_limit" ? "rate_limit_error" : "api_error",
-              message: err.message,
-            },
-          })
+          emitErrorAsText(`[${err.kind}] ${err.message}`)
         } else {
           opts.log.error("stream translation error", {
             err: String(err),
             activeToolNames,
             activeToolCalls,
           })
-          ensureMessageStart()
-          emit("error", {
-            type: "error",
-            error: { type: "api_error", message: String(err) },
-          })
+          emitErrorAsText(`[proxy error] ${String(err)}`)
         }
       } finally {
         controller.close()

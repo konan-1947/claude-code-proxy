@@ -11,8 +11,8 @@ export const MODEL_ALIASES = new Map<string, string>([
   ["claude-haiku-4-5-20251001", "gpt-5.4-mini"],
   ["sonnet", "gpt-5.4"],
   ["claude-sonnet-4-6", "gpt-5.4"],
-  ["opus", "gpt-5.4"],
-  ["claude-opus-4-7", "gpt-5.4"],
+  ["opus", "gpt-5.2"],
+  ["claude-opus-4-7", "gpt-5.2"],
 ])
 
 export function resolveModel(model: string): string {

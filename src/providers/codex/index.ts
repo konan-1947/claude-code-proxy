@@ -1,6 +1,8 @@
 import type { AnthropicRequest } from "../../anthropic/schema.ts"
 import type { Provider, RequestContext, CliHandlers } from "../types.ts"
 import {
+  ALLOWED_MODELS,
+  MODEL_ALIASES,
   assertAllowedModel,
   ModelNotAllowedError,
   resolveModel,
@@ -362,7 +364,7 @@ const cli: CliHandlers = {
 
 export const codexProvider: Provider = {
   name: "codex",
-  supportedModels: new Set(["gpt-5.2", "gpt-5.3-codex", "gpt-5.4", "gpt-5.4-mini"]),
+  supportedModels: new Set([...ALLOWED_MODELS, ...MODEL_ALIASES.keys()]),
   handleMessages,
   handleCountTokens,
   cli,
