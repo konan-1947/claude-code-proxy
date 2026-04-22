@@ -25,6 +25,26 @@ describe("translateRequest", () => {
     expect(translated.include).toEqual(["reasoning.encrypted_content"])
   })
 
+  it("maps max effort to xhigh", () => {
+    const translated = translateRequest({
+      ...baseRequest,
+      output_config: { effort: "max" },
+    })
+
+    expect(translated.reasoning).toEqual({ effort: "xhigh" })
+    expect(translated.include).toEqual(["reasoning.encrypted_content"])
+  })
+
+  it("does not request encrypted reasoning for none effort", () => {
+    const translated = translateRequest({
+      ...baseRequest,
+      output_config: { effort: "none" },
+    })
+
+    expect(translated.reasoning).toEqual({ effort: "none" })
+    expect(translated.include).toBeUndefined()
+  })
+
   it("returns only the expected top-level upstream request fields", () => {
     const translated = translateRequest({
       ...baseRequest,

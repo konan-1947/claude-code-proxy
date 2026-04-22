@@ -4,7 +4,7 @@ import * as os from "os";
 import * as http from "http";
 import * as fs from "fs";
 import { spawn } from "child_process";
-import { ProxyManager } from "./proxy";
+import { ProxyManager, resolveProxyRoot } from "./proxy";
 import { enableCodexMode, enableDirectMode } from "./settings";
 
 const ASSETS = path.join(__dirname, "..", "assets");
@@ -302,7 +302,7 @@ function resolveBunForAuth(): string {
 
 function getRepoRoot(): string {
   // After tsc: __dirname = tray/dist → two levels up = repo root
-  return path.resolve(__dirname, "..", "..");
+  return resolveProxyRoot();
 }
 
 function startLogin(): void {

@@ -48,6 +48,7 @@
       width: 100%;
       max-width: 560px;
       margin: 0 auto;
+      min-height: 0;
     }
 
     .row {
@@ -136,9 +137,16 @@
       background: transparent;
       border-top: 1px solid rgba(0, 0, 0, 0.12);
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
       -webkit-app-region: no-drag;
+    }
+
+    .logs-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
     .log-box {
@@ -150,10 +158,11 @@
       font-size: 11px;
       line-height: 1.45;
       color: #222222;
-      height: 110px;
       overflow: auto;
       white-space: pre-wrap;
       word-break: break-word;
+      flex: 1;
+      min-height: 110px;
     }
 
     .log-line { display: block; }
@@ -212,7 +221,7 @@
     </div>
 
     <!-- Logs -->
-    <div class="card">
+    <div class="card logs-card">
       <div class="card-label">Logs</div>
       <div class="log-box" id="log-box">Waiting for logs...</div>
     </div>
@@ -220,7 +229,6 @@
   </div>
 
   <div class="footer">
-    <span class="version">claude-code-proxy</span>
     <button class="btn secondary" onclick="minimizeToTray()">Minimize to tray</button>
   </div>
 

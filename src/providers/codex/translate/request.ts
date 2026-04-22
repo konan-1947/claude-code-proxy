@@ -20,7 +20,7 @@ export interface ResponsesRequest {
     | "required"
     | { type: "function"; name: string }
   parallel_tool_calls?: boolean
-  reasoning?: { effort?: "low" | "medium" | "high"; summary?: unknown }
+  reasoning?: { effort?: OpenAIReasoningEffort; summary?: unknown }
   store: false
   stream: true
   include?: string[]
@@ -35,6 +35,9 @@ export interface ResponsesRequest {
   }
   client_metadata?: Record<string, string>
 }
+
+type OpenAIReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh"
+type OutputEffort = NonNullable<AnthropicRequest["output_config"]>["effort"]
 
 export type ResponsesInputItem =
   | {
@@ -99,12 +102,29 @@ export function translateRequest(req: AnthropicRequest, opts: TranslateOptions =
   if (instructions) out.instructions = instructions
   if (tools && tools.length) out.tools = tools
   if (opts.sessionId) out.prompt_cache_key = opts.sessionId
-  const effort = req.output_config?.effort
+  const effort = mapOpenAIReasoningEffort(req.output_config?.effort)
   if (effort) {
     out.reasoning = { effort }
-    out.include = ["reasoning.encrypted_content"]
+    if (effort !== "none") out.include = ["reasoning.encrypted_content"]
   }
   return out
+}
+
+function mapOpenAIReasoningEffort(effort: OutputEffort): OpenAIReasoningEffort | undefined {
+  if (!effort) return undefined
+  switch (effort) {
+    case "max":
+      return "xhigh"
+    case "none":
+    case "minimal":
+    case "low":
+    case "medium":
+    case "high":
+    case "xhigh":
+      return effort
+    default:
+      return "medium"
+  }
 }
 
 function mapToolChoice(

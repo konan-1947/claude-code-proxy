@@ -4,7 +4,14 @@ import * as os from "os";
 import * as fs from "fs";
 
 // After tsc: __dirname = <repo>/tray/dist → two levels up = repo root
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
+export function resolveProxyRoot(): string {
+  const packagedProxyRoot = path.join(process.resourcesPath, "proxy");
+  if (fs.existsSync(path.join(packagedProxyRoot, "src", "cli.ts"))) {
+    return packagedProxyRoot;
+  }
+
+  return path.resolve(__dirname, "..", "..");
+}
 
 function resolveBun(): string {
   const candidates: string[] = [
@@ -38,8 +45,9 @@ export class ProxyManager {
     this._status = "starting";
 
     const bunExe = resolveBun();
+    const proxyRoot = resolveProxyRoot();
     this.child = spawn(bunExe, ["run", "src/cli.ts", "serve"], {
-      cwd: REPO_ROOT,
+      cwd: proxyRoot,
       stdio: "ignore",
       env: {
         ...process.env,

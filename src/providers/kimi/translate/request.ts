@@ -66,6 +66,7 @@ export interface TranslateOptions {
 }
 
 const DEFAULT_MAX_TOKENS = 32000
+type OutputEffort = NonNullable<AnthropicRequest["output_config"]>["effort"]
 
 // Kimi's `kimi-for-coding` is a reasoning model: it always produces
 // reasoning_content and its server always enforces that prior assistant
@@ -86,7 +87,7 @@ export function translateRequest(
     stream: true,
     stream_options: { include_usage: true },
     max_tokens: clampMaxTokens(req.max_tokens),
-    reasoning_effort: req.output_config?.effort ?? "medium",
+    reasoning_effort: mapKimiReasoningEffort(req.output_config?.effort),
     thinking: { type: "enabled" },
   }
   if (tools && tools.length) out.tools = tools
@@ -99,6 +100,23 @@ export function translateRequest(
 function clampMaxTokens(requested: number | undefined): number {
   if (!requested || requested <= 0) return DEFAULT_MAX_TOKENS
   return Math.min(requested, DEFAULT_MAX_TOKENS)
+}
+
+function mapKimiReasoningEffort(effort: OutputEffort): "low" | "medium" | "high" {
+  switch (effort) {
+    case "none":
+    case "minimal":
+    case "low":
+      return "low"
+    case "medium":
+      return "medium"
+    case "high":
+    case "xhigh":
+    case "max":
+      return "high"
+    default:
+      return "medium"
+  }
 }
 
 function mapToolChoice(choice: AnthropicRequest["tool_choice"]): KimiToolChoice {
