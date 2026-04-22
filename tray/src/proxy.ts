@@ -1,0 +1,91 @@
+import { spawn, ChildProcess } from "child_process";
+import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+
+// After tsc: __dirname = <repo>/tray/dist → two levels up = repo root
+const REPO_ROOT = path.resolve(__dirname, "..", "..");
+
+function resolveBun(): string {
+  const candidates: string[] = [
+    path.join(os.homedir(), ".bun", "bin", "bun.exe"),
+    "bun.exe",
+  ];
+
+  for (const candidate of candidates) {
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) return candidate;
+    } else {
+      return candidate;
+    }
+  }
+
+  return "bun.exe";
+}
+
+export type ProxyStatus = "running" | "stopped" | "starting" | "stopping";
+
+export class ProxyManager {
+  private child: ChildProcess | null = null;
+  private _status: ProxyStatus = "stopped";
+
+  get status(): ProxyStatus {
+    return this._status;
+  }
+
+  start(): void {
+    if (this._status === "running" || this._status === "starting") return;
+    this._status = "starting";
+
+    const bunExe = resolveBun();
+    this.child = spawn(bunExe, ["run", "src/cli.ts", "serve"], {
+      cwd: REPO_ROOT,
+      stdio: "ignore",
+      env: {
+        ...process.env,
+        PATH: [
+          path.join(os.homedir(), ".bun", "bin"),
+          process.env["PATH"] ?? "",
+        ].join(";"),
+      },
+    });
+
+    this.child.on("error", (err) => {
+      console.error("[proxy] spawn error:", err.message);
+      this._status = "stopped";
+      this.child = null;
+    });
+
+    this.child.on("exit", (code, signal) => {
+      console.log(`[proxy] exited code=${code} signal=${signal}`);
+      this._status = "stopped";
+      this.child = null;
+    });
+
+    // Health polling in main.ts will confirm actual running state.
+    // Set "running" optimistically after 2s so the menu doesn't stay stuck on "starting".
+    setTimeout(() => {
+      if (this._status === "starting") this._status = "running";
+    }, 2000);
+  }
+
+  stop(): void {
+    if (this._status === "stopped" || this._status === "stopping") return;
+    this._status = "stopping";
+
+    if (this.child?.pid != null) {
+      spawn("taskkill", ["/pid", String(this.child.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
+    }
+    // Status becomes "stopped" via the exit handler.
+  }
+
+  setStatus(s: ProxyStatus): void {
+    this._status = s;
+  }
+
+  isRunning(): boolean {
+    return this._status === "running";
+  }
+}

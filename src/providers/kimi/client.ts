@@ -28,7 +28,12 @@ export async function postKimi(
   ctx: RequestContext,
 ): Promise<KimiResponse> {
   const log = ctx.childLogger("kimi.client")
-  let auth = await getAuth()
+  let auth
+  try {
+    auth = await getAuth()
+  } catch (err) {
+    throw new KimiError(401, "Unauthorized", String(err))
+  }
   let resp = await doFetch(auth.access, body, log, ctx.signal)
 
   if (resp.status === 401) {

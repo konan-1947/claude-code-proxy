@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun typecheck *)",
+      "Bash(bun run *)",
+      "Bash(bun install *)",
+      "Bash(sed 's/^\\\\.//')",
+      "Bash(awk -F/ '{for\\(i=1;i<NF;i++\\)printf \"  \"; print \"├── \" $NF}')",
+      "Bash(where bun *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node *)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"electron-builder\")",
+      "Bash(taskkill /F /IM \"electron-builder*\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Read(//c/Users/Konan_1947/.config/claude-code-proxy/**)",
+      "Read(//c/Users/Konan_1947/.config/claude-code-proxy/codex/**)",
+      "Bash(tasklist)"
+    ]
+  }
+}

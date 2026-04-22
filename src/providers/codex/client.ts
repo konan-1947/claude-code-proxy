@@ -15,7 +15,12 @@ export async function postCodex(
   ctx: RequestContext,
 ): Promise<CodexResponse> {
   const log = ctx.childLogger("codex.client")
-  let auth = await getAuth()
+  let auth
+  try {
+    auth = await getAuth()
+  } catch (err) {
+    throw new CodexError(401, "Unauthorized", String(err))
+  }
   let resp = await doFetch(auth.access, auth.accountId, body, log, ctx.signal, ctx.sessionId)
 
   if (resp.status === 401) {

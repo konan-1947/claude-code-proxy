@@ -1,0 +1,46 @@
+{
+  "name": "claude-code-proxy-tray",
+  "version": "1.0.0",
+  "description": "System tray manager for claude-code-proxy",
+  "author": "konan-1947",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "npm run build && electron .",
+    "start": "electron .",
+    "icons": "node scripts/make-icons.js",
+    "dist": "npm run build && electron-builder --win portable"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^41.2.2",
+    "electron-builder": "^25.1.8",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^3.0.1",
+    "typescript": "^5.6.0"
+  },
+  "build": {
+    "appId": "com.claude-code-proxy.tray",
+    "productName": "Claude Proxy Tray",
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    },
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "proxy",
+        "filter": [
+          "src/**",
+          "package.json",
+          "bun.lock",
+          "tsconfig.json"
+        ]
+      }
+    ]
+  }
+}

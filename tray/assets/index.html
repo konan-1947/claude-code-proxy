@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Claude Code Proxy</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #ffffff;
+      color: #111111;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-app-region: drag;
+      background-image: url("bg.png");
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: contain;
+    }
+
+    .titlebar {
+      width: 100%;
+      background: transparent;
+      padding: 12px 16px 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .titlebar h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111111;
+      letter-spacing: 0.02em;
+    }
+
+    .content {
+      flex: 1;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      -webkit-app-region: no-drag;
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .card {
+      background: transparent;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .card-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #666666;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .dot.on   { background: #111111; border: 1px solid #111111; }
+    .dot.off  { background: transparent; border: 1px solid #999999; }
+    .dot.busy { background: #666666; border: 1px solid #666666; }
+
+    .status-text { font-size: 13px; color: #111111; font-weight: 500; }
+    .sub-text    { font-size: 11px; color: #666666; margin-top: 3px; }
+
+    .hint-box {
+      background: transparent;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #333333;
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s;
+      -webkit-app-region: no-drag;
+      font-family: inherit;
+      background: transparent;
+      color: #111111;
+    }
+    .btn:hover  { opacity: 0.85; }
+    .btn:active { opacity: 0.7; transform: scale(0.98); }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    .btn.primary   { background: #111111; color: #ffffff; border-color: #111111; }
+    .btn.success   { background: transparent; color: #111111; border-color: #d0d0d0; }
+    .btn.danger    { background: transparent; color: #111111; border-color: #d0d0d0; }
+    .btn.secondary { background: transparent; color: #111111; border-color: #d0d0d0; }
+    .btn.primary   { background: transparent; color: #111111; border-color: #d0d0d0; }
+
+    .footer {
+      width: 100%;
+      padding: 11px 16px;
+      background: transparent;
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      -webkit-app-region: no-drag;
+    }
+
+    .log-box {
+      background: transparent;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #222222;
+      height: 110px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .log-line { display: block; }
+    .log-prefix { font-weight: 700; }
+    .log-user-request .log-prefix { color: #0b61d6; }
+    .log-user-response .log-prefix { color: #067a46; }
+    .log-health .log-prefix { color: #b05a00; }
+    .log-user-action .log-prefix { color: #6b39c2; }
+    .log-proxy .log-prefix { color: #666666; }
+    .log-tray .log-prefix { color: #666666; }
+
+    .version { font-size: 11px; color: #666666; }
+  </style>
+</head>
+<body>
+
+  <div class="titlebar">
+    <h1>Claude Code Proxy</h1>
+  </div>
+
+  <div class="content">
+
+    <div class="row">
+    <!-- Auth card -->
+    <div class="card">
+      <div class="card-label">Authentication</div>
+      <div class="status-row">
+        <div class="dot" id="auth-dot"></div>
+        <div>
+          <div class="status-text" id="auth-text">Checking...</div>
+          <div class="sub-text"   id="auth-sub"></div>
+        </div>
+      </div>
+      <div class="hint-box" id="login-hint" style="display:none">
+        A browser window will open for ChatGPT/Codex sign-in.<br>
+        Return here after login to refresh status.
+      </div>
+      <button class="btn primary" id="login-btn" onclick="loginCodex()" style="display:none">
+        Sign in
+      </button>
+    </div>
+
+    <!-- Proxy card -->
+    <div class="card">
+      <div class="card-label">Proxy</div>
+      <div class="status-row">
+        <div class="dot" id="proxy-dot"></div>
+        <div>
+          <div class="status-text" id="proxy-text">Checking...</div>
+          <div class="sub-text"   id="proxy-sub"></div>
+        </div>
+      </div>
+      <button class="btn" id="proxy-btn" onclick="toggleProxy()">...</button>
+    </div>
+
+    </div>
+
+    <!-- Logs -->
+    <div class="card">
+      <div class="card-label">Logs</div>
+      <div class="log-box" id="log-box">Waiting for logs...</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span class="version">claude-code-proxy</span>
+    <button class="btn secondary" onclick="minimizeToTray()">Minimize to tray</button>
+  </div>
+
+  <script>
+    (function bootstrap() {
+      if (window.__ccp_ui_started) return;
+      window.__ccp_ui_started = true;
+
+      const api = window.api;
+      let currentStatus = null;
+      const logBox = document.getElementById('log-box');
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      function classify(line) {
+        const m = String(line).match(/^\[([^\]]+)\]\s*/);
+        const p = m ? m[1].toLowerCase() : 'proxy';
+        if (p === 'user request') return 'log-user-request';
+        if (p === 'user response') return 'log-user-response';
+        if (p === 'health') return 'log-health';
+        if (p === 'user action') return 'log-user-action';
+        if (p === 'tray') return 'log-tray';
+        return 'log-proxy';
+      }
+
+      function splitPrefix(line) {
+        const m = String(line).match(/^(\[[^\]]+\])\s*(.*)$/);
+        if (!m) return { prefix: '[proxy]', rest: String(line) };
+        return { prefix: m[1], rest: m[2] ?? '' };
+      }
+
+      function appendLog(line) {
+        if (!logBox) return;
+        if (logBox.textContent === 'Waiting for logs...') logBox.textContent = '';
+        const { prefix, rest } = splitPrefix(line);
+        const cls = classify(line);
+        const html = `<span class="log-line ${cls}"><span class="log-prefix">${escapeHtml(prefix)}</span> ${escapeHtml(rest)}</span>`;
+        logBox.insertAdjacentHTML('beforeend', html + '\n');
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+
+      function setCheckingError(message) {
+        // If IPC/preload is unavailable or a status fetch fails, surface it instead of
+        // leaving the UI stuck on "Checking...".
+        const authDot  = document.getElementById('auth-dot');
+        const authText = document.getElementById('auth-text');
+        const authSub  = document.getElementById('auth-sub');
+        const loginBtn = document.getElementById('login-btn');
+        const loginHint = document.getElementById('login-hint');
+
+        const proxyDot  = document.getElementById('proxy-dot');
+        const proxyText = document.getElementById('proxy-text');
+        const proxySub  = document.getElementById('proxy-sub');
+        const proxyBtn  = document.getElementById('proxy-btn');
+
+        authDot.className = 'dot off';
+        authText.textContent = 'Cannot update';
+        authSub.textContent = message;
+        loginBtn.style.display = 'none';
+        loginHint.style.display = 'none';
+
+        proxyDot.className = 'dot off';
+        proxyText.textContent = 'Cannot update';
+        proxySub.textContent = message;
+        proxyBtn.textContent = '...';
+        proxyBtn.disabled = true;
+
+        appendLog(`UI error: ${message}`);
+      }
+
+      function render(s) {
+        currentStatus = s;
+
+      // --- Auth ---
+      const authDot  = document.getElementById('auth-dot');
+      const authText = document.getElementById('auth-text');
+      const authSub  = document.getElementById('auth-sub');
+      const loginBtn = document.getElementById('login-btn');
+      const loginHint = document.getElementById('login-hint');
+
+      if (s.loginInProgress) {
+        authDot.className = 'dot busy';
+        authText.textContent = 'Signing in...';
+        authSub.textContent  = 'Complete in browser';
+        loginBtn.style.display  = 'none';
+        loginHint.style.display = 'block';
+      } else if (s.authValid) {
+        authDot.className = 'dot on';
+        authText.textContent = 'Signed in';
+        authSub.textContent  = s.authEmail || 'Codex / ChatGPT';
+        loginBtn.style.display  = 'none';
+        loginHint.style.display = 'none';
+      } else {
+        authDot.className = 'dot off';
+        authText.textContent = 'Not signed in';
+        authSub.textContent  = 'Sign in to use Codex';
+        loginBtn.style.display  = 'inline-flex';
+        loginHint.style.display = 'none';
+      }
+
+      // --- Proxy ---
+      const proxyDot  = document.getElementById('proxy-dot');
+      const proxyText = document.getElementById('proxy-text');
+      const proxySub  = document.getElementById('proxy-sub');
+      const proxyBtn  = document.getElementById('proxy-btn');
+
+      if (s.proxyRunning) {
+        proxyDot.className = 'dot on';
+        proxyText.textContent = 'Running';
+        proxySub.textContent  = String(s.port);
+        proxyBtn.textContent  = 'Stop';
+        proxyBtn.className    = 'btn danger';
+      } else {
+        proxyDot.className = 'dot off';
+        proxyText.textContent = 'Stopped';
+        proxySub.textContent  = String(s.port);
+        proxyBtn.textContent  = 'Start';
+        proxyBtn.className    = 'btn success';
+      }
+    }
+
+      window.loginCodex = async function loginCodex() {
+        if (!api || typeof api.loginCodex !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        await api.loginCodex();
+      };
+
+      window.toggleProxy = async function toggleProxy() {
+        if (!api || typeof api.startProxy !== 'function' || typeof api.stopProxy !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        if (currentStatus && currentStatus.proxyRunning) {
+          await api.stopProxy();
+        } else {
+          await api.startProxy();
+        }
+      };
+
+      window.minimizeToTray = function minimizeToTray() {
+        if (!api || typeof api.minimizeToTray !== 'function') return;
+        api.minimizeToTray();
+      };
+
+      async function refreshStatus() {
+        if (!api || typeof api.getStatus !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        try {
+          const s = await api.getStatus();
+          render(s);
+        } catch (err) {
+          setCheckingError(String(err));
+        }
+      }
+
+      if (api && typeof api.onStatusUpdate === 'function') {
+        api.onStatusUpdate(render);
+      }
+
+      if (api && typeof api.onLog === 'function') {
+        api.onLog(appendLog);
+      }
+
+      if (api && typeof api.getLogs === 'function') {
+        api.getLogs().then((lines) => {
+          for (const line of (lines || [])) appendLog(line);
+        }).catch((err) => appendLog(`getLogs error: ${String(err)}`));
+      } else {
+        appendLog('IPC bridge unavailable (preload not loaded)');
+      }
+
+      refreshStatus();
+      setInterval(refreshStatus, 2000);
+    })();
+  </script>
+
+</body>
+</html>
