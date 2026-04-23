@@ -16,6 +16,16 @@ export const MODEL_ALIASES = new Map<string, string>([
 ])
 
 export function resolveModel(model: string): string {
+  // The CCP_CODEX_MODEL environment variable overrides the model so that
+  // regardless of whatever model is requested by the harness, the provided
+  // model is always used.
+  if (
+    process.env.CCP_CODEX_MODEL !== undefined &&
+    process.env.CCP_CODEX_MODEL !== ""
+  ) {
+    return process.env.CCP_CODEX_MODEL
+  }
+
   return MODEL_ALIASES.get(model) ?? model
 }
 

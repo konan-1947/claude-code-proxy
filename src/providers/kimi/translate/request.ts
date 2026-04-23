@@ -81,6 +81,7 @@ export function translateRequest(
   const messages = buildMessages(req)
   const tools = req.tools?.map(toKimiTool)
 
+  assertValidEffort(req.output_config?.effort)
   const out: KimiChatRequest = {
     model: req.model,
     messages,
@@ -102,6 +103,16 @@ function clampMaxTokens(requested: number | undefined): number {
   return Math.min(requested, DEFAULT_MAX_TOKENS)
 }
 
+const ANTHROPIC_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"])
+
+function assertValidEffort(effort: unknown): void {
+  if (effort !== undefined && !ANTHROPIC_EFFORTS.has(effort as string)) {
+    throw new Error(
+      `Invalid output_config.effort: "${effort}". Must be one of: ${Array.from(ANTHROPIC_EFFORTS).join(", ")}`,
+    )
+  }
+}
+
 function mapKimiReasoningEffort(effort: OutputEffort): "low" | "medium" | "high" {
   switch (effort) {
     case "none":
@@ -118,6 +129,7 @@ function mapKimiReasoningEffort(effort: OutputEffort): "low" | "medium" | "high"
       return "medium"
   }
 }
+
 
 function mapToolChoice(choice: AnthropicRequest["tool_choice"]): KimiToolChoice {
   if (!choice) return "auto"

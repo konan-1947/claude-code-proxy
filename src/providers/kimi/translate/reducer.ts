@@ -1,5 +1,4 @@
 import { parseSseStream } from "../../../sse.ts"
-import type { Logger } from "../../../log.ts"
 
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
@@ -67,9 +66,13 @@ interface ToolSlot {
  * of typed, downstream-agnostic ReducerEvents consumed by both the
  * streaming and non-streaming frontends.
  */
+export interface ReducerStats {
+  chunkCount: number
+}
+
 export async function* reduceUpstream(
   upstream: ReadableStream<Uint8Array>,
-  log: Logger,
+  stats?: ReducerStats,
 ): AsyncGenerator<ReducerEvent> {
   let nextBlockIndex = 0
   let thinkingIndex: number | undefined
@@ -113,15 +116,7 @@ export async function* reduceUpstream(
       continue
     }
 
-    if (VERBOSE) {
-      const d = chunk.choices?.[0]?.delta
-      log.debug("upstream chunk", {
-        hasReasoning: typeof d?.reasoning_content === "string",
-        hasContent: typeof d?.content === "string" && d.content.length > 0,
-        toolCalls: d?.tool_calls?.length,
-        finish: chunk.choices?.[0]?.finish_reason,
-      })
-    }
+    if (stats) stats.chunkCount++
 
     if (chunk.error) {
       throw new UpstreamStreamError("failed", chunk.error.message || "Upstream error")

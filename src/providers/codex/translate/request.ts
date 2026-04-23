@@ -7,6 +7,8 @@ import type {
   AnthropicTool,
 } from "../../../anthropic/schema.ts"
 
+export type Effort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh"
+
 // Keep this aligned to the upstream Codex ResponsesApiRequest field set.
 // Do not add plausible-looking top-level fields without source support or a confirmed live test.
 export interface ResponsesRequest {
@@ -72,6 +74,38 @@ export interface ResponsesTool {
 
 export interface TranslateOptions {
   sessionId?: string
+}
+
+const VALID_EFFORTS = new Set<Effort>(["none", "low", "medium", "high", "xhigh"])
+
+const ANTHROPIC_EFFORTS = new Set(["low", "medium", "high", "max"])
+
+function assertValidEffort(effort: unknown): void {
+  if (effort !== undefined && !ANTHROPIC_EFFORTS.has(effort as string)) {
+    throw new Error(
+      `Invalid output_config.effort: "${effort}". Must be one of: ${Array.from(ANTHROPIC_EFFORTS).join(", ")}`,
+    )
+  }
+}
+
+function toCodexEffort(
+  effort: NonNullable<AnthropicRequest["output_config"]>["effort"],
+): Effort | undefined {
+  if (effort === "max") return "xhigh"
+  return effort
+}
+
+function resolveEffort(effort?: Effort): Effort | undefined {
+  const override = process.env.CCP_CODEX_EFFORT
+  if (override === undefined || override === "") {
+    return effort
+  }
+  if (!VALID_EFFORTS.has(override as Effort)) {
+    throw new Error(
+      `Invalid effort override: "${override}". Must be one of: ${Array.from(VALID_EFFORTS).join(", ")}`,
+    )
+  }
+  return override as Effort
 }
 
 export function translateRequest(req: AnthropicRequest, opts: TranslateOptions = {}): ResponsesRequest {
