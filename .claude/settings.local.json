@@ -16,7 +16,10 @@
       "Bash(taskkill /F /IM node.exe)",
       "Read(//c/Users/Konan_1947/.config/claude-code-proxy/**)",
       "Read(//c/Users/Konan_1947/.config/claude-code-proxy/codex/**)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(git push *)",
+      "Bash(taskkill /F /IM \"Claude Proxy Tray.exe\" /T)",
+      "Bash(taskkill /F /IM \"Claude Proxy Tray 1.0.0.e\" /T)"
     ]
   }
 }

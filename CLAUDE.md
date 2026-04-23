@@ -88,6 +88,7 @@ Claude Code (Anthropic Messages API)
 | `XDG_STATE_HOME` | `~/.local/state` | Base dir for `proxy.log` |
 | `KIMI_OAUTH_HOST` | `https://auth.kimi.com` | Override Kimi OAuth endpoint |
 | `KIMI_BASE_URL` | `https://api.kimi.com/coding/v1` | Override Kimi API endpoint |
+| `CCP_INSECURE_TLS` | unset | Skip TLS cert verification (also honoured by `NODE_TLS_REJECT_UNAUTHORIZED=0`) — use when behind a corporate proxy/VPN doing SSL inspection |
 
 ## Pointing Claude Code at the proxy
 

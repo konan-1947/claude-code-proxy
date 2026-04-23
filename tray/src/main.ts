@@ -222,6 +222,23 @@ function getStatus() {
 
 // ---- Window ------------------------------------------------------------
 
+function createSplashWindow(): BrowserWindow {
+  const splash = new BrowserWindow({
+    width: 560,
+    height: 560,
+    frame: false,
+    resizable: false,
+    center: true,
+    icon: path.join(ASSETS, "icon-256.png"),
+    show: true,
+    backgroundColor: "#ffffff",
+    skipTaskbar: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  void splash.loadFile(path.join(ASSETS, "splash.html"));
+  return splash;
+}
+
 function pushStatusUpdate(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("status-update", getStatus());
@@ -445,7 +462,9 @@ app.whenReady().then(() => {
   ipcMain.handle("login-codex", () => startLogin());
   ipcMain.on("minimize-to-tray", () => mainWindow?.hide());
 
+  const splash = createSplashWindow();
   mainWindow = createMainWindow();
+  mainWindow.once("ready-to-show", () => splash.destroy());
   uiLog("app ready", { port: PORT });
   pushStatusUpdate();
   startProxyLogTail();

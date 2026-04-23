@@ -84,12 +84,25 @@ async function doFetch(
     toolCount: body.tools?.length ?? 0,
   })
 
-  return fetch(CODEX_API_ENDPOINT, {
+  return fetchWithTlsFallback(CODEX_API_ENDPOINT, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
     signal,
   })
+}
+
+async function fetchWithTlsFallback(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (/self.?signed|certificate|ssl|tls/i.test(msg)) {
+      // @ts-ignore Bun-specific TLS option
+      return fetch(url, { ...init, tls: { rejectUnauthorized: false } })
+    }
+    throw err
+  }
 }
 
 async function safeText(resp: Response): Promise<string> {
