@@ -3,6 +3,7 @@
     "allow": [
       "Bash(bun typecheck *)",
       "Bash(bun run *)",
+      "Bash(bun test *)",
       "Bash(bun install *)",
       "Bash(sed 's/^\\\\.//')",
       "Bash(awk -F/ '{for\\(i=1;i<NF;i++\\)printf \"  \"; print \"├── \" $NF}')",
@@ -19,7 +20,14 @@
       "Bash(tasklist)",
       "Bash(git push *)",
       "Bash(taskkill /F /IM \"Claude Proxy Tray.exe\" /T)",
-      "Bash(taskkill /F /IM \"Claude Proxy Tray 1.0.0.e\" /T)"
+      "Bash(taskkill /F /IM \"Claude Proxy Tray 1.0.0.e\" /T)",
+      "Bash(claude *)",
+      "Bash(python *)",
+      "Bash(bash *)",
+      "Bash(cygpath *)",
+      "Skill(claude-api)",
+      "Skill(update-config)",
+      "Bash(bun test *)"
     ]
   }
 }

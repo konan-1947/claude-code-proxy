@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Claude Code Proxy</title>
+  <title></title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -19,23 +19,6 @@
       background-repeat: no-repeat;
       background-position: center center;
       background-size: contain;
-    }
-
-    .titlebar {
-      width: 100%;
-      background: transparent;
-      padding: 12px 16px 11px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-    }
-
-    .titlebar h1 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #111111;
-      letter-spacing: 0.02em;
     }
 
     .content {
@@ -78,6 +61,31 @@
       align-items: center;
       gap: 10px;
       margin-bottom: 12px;
+    }
+
+    .status-card {
+      padding: 12px 20px;
+    }
+
+    .auth-card .status-row {
+      margin-bottom: 0;
+    }
+
+    .auth-card .hint-box,
+    .auth-card #login-btn {
+      margin-top: 12px;
+    }
+
+    .proxy-status-row {
+      justify-content: space-between;
+      margin-bottom: 0;
+    }
+
+    .proxy-status-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
 
     .dot {
@@ -142,11 +150,65 @@
       -webkit-app-region: no-drag;
     }
 
+    .mapping-card {
+      padding: 10px 16px 12px;
+    }
+
+    .mapping-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .mapping-head .card-label,
+    .mapping-note {
+      margin: 0;
+    }
+
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .mapping-field .sub-text {
+      margin: 0 0 4px;
+    }
+
+    .mapping-select {
+      width: 100%;
+      height: 34px;
+      padding: 0 28px 0 10px;
+    }
+
     .logs-card {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
+    }
+
+    .logs-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .logs-head .card-label {
+      margin: 0;
+    }
+
+    .log-scroll-btn {
+      padding: 5px 10px;
+      font-size: 11px;
+    }
+
+    .log-scroll-btn.off {
+      opacity: 0.55;
     }
 
     .log-box {
@@ -179,15 +241,11 @@
 </head>
 <body>
 
-  <div class="titlebar">
-    <h1>Claude Code Proxy</h1>
-  </div>
-
   <div class="content">
 
     <div class="row">
     <!-- Auth card -->
-    <div class="card">
+    <div class="card status-card auth-card">
       <div class="card-label">Authentication</div>
       <div class="status-row">
         <div class="dot" id="auth-dot"></div>
@@ -206,23 +264,51 @@
     </div>
 
     <!-- Proxy card -->
-    <div class="card">
+    <div class="card status-card">
       <div class="card-label">Proxy</div>
-      <div class="status-row">
-        <div class="dot" id="proxy-dot"></div>
-        <div>
-          <div class="status-text" id="proxy-text">Checking...</div>
-          <div class="sub-text"   id="proxy-sub"></div>
+      <div class="status-row proxy-status-row">
+        <div class="proxy-status-main">
+          <div class="dot" id="proxy-dot"></div>
+          <div>
+            <div class="status-text" id="proxy-text">Checking...</div>
+            <div class="sub-text"   id="proxy-sub"></div>
+          </div>
         </div>
+        <button class="btn" id="proxy-btn" onclick="toggleProxy()">...</button>
       </div>
-      <button class="btn" id="proxy-btn" onclick="toggleProxy()">...</button>
     </div>
 
+    </div>
+
+    <!-- Model mapping -->
+    <div class="card mapping-card">
+      <div class="mapping-head">
+        <div class="card-label">Model mapping</div>
+        <div class="sub-text mapping-note">Changing mapping restarts proxy</div>
+      </div>
+
+      <div class="mapping-grid">
+        <div class="mapping-field">
+          <div class="sub-text">Haiku</div>
+          <select id="map-haiku" class="btn mapping-select" onchange="updateMapping()"></select>
+        </div>
+        <div class="mapping-field">
+          <div class="sub-text">Sonnet</div>
+          <select id="map-sonnet" class="btn mapping-select" onchange="updateMapping()"></select>
+        </div>
+        <div class="mapping-field">
+          <div class="sub-text">Opus</div>
+          <select id="map-opus" class="btn mapping-select" onchange="updateMapping()"></select>
+        </div>
+      </div>
     </div>
 
     <!-- Logs -->
     <div class="card logs-card">
-      <div class="card-label">Logs</div>
+      <div class="logs-head">
+        <div class="card-label">Logs</div>
+        <button class="btn secondary log-scroll-btn" id="log-scroll-btn" onclick="toggleLogScroll()">Auto scroll: On</button>
+      </div>
       <div class="log-box" id="log-box">Waiting for logs...</div>
     </div>
 
@@ -239,7 +325,9 @@
 
       const api = window.api;
       let currentStatus = null;
+      let autoScrollLogs = true;
       const logBox = document.getElementById('log-box');
+      const logScrollBtn = document.getElementById('log-scroll-btn');
 
       function escapeHtml(s) {
         return String(s)
@@ -274,8 +362,17 @@
         const cls = classify(line);
         const html = `<span class="log-line ${cls}"><span class="log-prefix">${escapeHtml(prefix)}</span> ${escapeHtml(rest)}</span>`;
         logBox.insertAdjacentHTML('beforeend', html + '\n');
-        logBox.scrollTop = logBox.scrollHeight;
+        if (autoScrollLogs) logBox.scrollTop = logBox.scrollHeight;
       }
+
+      window.toggleLogScroll = function toggleLogScroll() {
+        autoScrollLogs = !autoScrollLogs;
+        if (logScrollBtn) {
+          logScrollBtn.textContent = autoScrollLogs ? 'Auto scroll: On' : 'Auto scroll: Off';
+          logScrollBtn.classList.toggle('off', !autoScrollLogs);
+        }
+        if (autoScrollLogs && logBox) logBox.scrollTop = logBox.scrollHeight;
+      };
 
       function setCheckingError(message) {
         // If IPC/preload is unavailable or a status fetch fails, surface it instead of
@@ -308,6 +405,39 @@
 
       function render(s) {
         currentStatus = s;
+
+      // --- Model mapping ---
+      const haikuSel = document.getElementById('map-haiku');
+      const sonnetSel = document.getElementById('map-sonnet');
+      const opusSel = document.getElementById('map-opus');
+      const options = [
+        { value: 'gpt-5.2', label: 'gpt-5.2' },
+        { value: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
+        { value: 'gpt-5.4', label: 'gpt-5.4' },
+        { value: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
+      ];
+
+      function fillSelect(sel, value) {
+        if (!sel) return;
+        if (!sel.__ccp_filled) {
+          sel.innerHTML = '';
+          for (const opt of options) {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            sel.appendChild(o);
+          }
+          sel.__ccp_filled = true;
+        }
+        if (value) sel.value = String(value);
+      }
+
+      if (s && s.codexAliases) {
+        fillSelect(haikuSel, s.codexAliases.haiku);
+        fillSelect(sonnetSel, s.codexAliases.sonnet);
+        fillSelect(opusSel, s.codexAliases.opus);
+      }
+
 
       // --- Auth ---
       const authDot  = document.getElementById('auth-dot');
@@ -363,6 +493,21 @@
           return;
         }
         await api.loginCodex();
+      };
+
+      window.updateMapping = async function updateMapping() {
+        if (!api || typeof api.setCodexAliases !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        const haikuSel = document.getElementById('map-haiku');
+        const sonnetSel = document.getElementById('map-sonnet');
+        const opusSel = document.getElementById('map-opus');
+        await api.setCodexAliases({
+          haiku: haikuSel ? haikuSel.value : undefined,
+          sonnet: sonnetSel ? sonnetSel.value : undefined,
+          opus: opusSel ? opusSel.value : undefined,
+        });
       };
 
       window.toggleProxy = async function toggleProxy() {

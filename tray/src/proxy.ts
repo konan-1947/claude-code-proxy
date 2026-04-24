@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from "child_process";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import { getClaudeEnv } from "./settings";
 
 // After tsc: __dirname = <repo>/tray/dist → two levels up = repo root
 export function resolveProxyRoot(): string {
@@ -46,14 +47,16 @@ export class ProxyManager {
 
     const bunExe = resolveBun();
     const proxyRoot = resolveProxyRoot();
+    const persistedEnv = getClaudeEnv();
     this.child = spawn(bunExe, ["run", "src/cli.ts", "serve"], {
       cwd: proxyRoot,
       stdio: "ignore",
       env: {
         ...process.env,
+        ...persistedEnv,
         PATH: [
           path.join(os.homedir(), ".bun", "bin"),
-          process.env["PATH"] ?? "",
+          persistedEnv["PATH"] ?? process.env["PATH"] ?? "",
         ].join(";"),
       },
     });

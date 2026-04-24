@@ -5,7 +5,13 @@ import * as http from "http";
 import * as fs from "fs";
 import { spawn } from "child_process";
 import { ProxyManager, resolveProxyRoot } from "./proxy";
-import { enableCodexMode, enableDirectMode } from "./settings";
+import {
+  enableCodexMode,
+  enableDirectMode,
+  getCodexAliases,
+  isCodexAllowedUpstreamModel,
+  setCodexAliases,
+} from "./settings";
 
 const ASSETS = path.join(__dirname, "..", "assets");
 const AUTH_JSON = path.join(
@@ -217,6 +223,7 @@ function getStatus() {
     authEmail: auth.email,
     loginInProgress,
     port: PORT,
+    codexAliases: getCodexAliases(),
   };
 }
 
@@ -262,7 +269,8 @@ function createMainWindow(): BrowserWindow {
     resizable: true,
     maximizable: true,
     fullscreenable: true,
-    title: "Claude Code Proxy",
+    frame: false,
+    title: "",
     icon: path.join(ASSETS, "icon-256.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -457,6 +465,41 @@ app.whenReady().then(() => {
     enableDirectMode();
     proxy.stop();
     updateTray();
+    pushStatusUpdate();
+  });
+  ipcMain.handle("set-codex-aliases", (_event, next: { haiku?: string; sonnet?: string; opus?: string }) => {
+    const validated: Parameters<typeof setCodexAliases>[0] = {};
+
+    if (next.haiku !== undefined) {
+      if (!isCodexAllowedUpstreamModel(next.haiku)) {
+        throw new Error(`Invalid haiku model: ${next.haiku}`);
+      }
+      validated.haiku = next.haiku;
+    }
+
+    if (next.sonnet !== undefined) {
+      if (!isCodexAllowedUpstreamModel(next.sonnet)) {
+        throw new Error(`Invalid sonnet model: ${next.sonnet}`);
+      }
+      validated.sonnet = next.sonnet;
+    }
+
+    if (next.opus !== undefined) {
+      if (!isCodexAllowedUpstreamModel(next.opus)) {
+        throw new Error(`Invalid opus model: ${next.opus}`);
+      }
+      validated.opus = next.opus;
+    }
+
+    pushUiLog(`[user action] ${new Date().toISOString()} set codex aliases ${safeJson(validated)}`);
+    setCodexAliases(validated);
+
+    if (proxy.isRunning()) {
+      proxy.stop();
+      enableCodexMode(PORT);
+      proxy.start();
+      updateTray();
+    }
     pushStatusUpdate();
   });
   ipcMain.handle("login-codex", () => startLogin());

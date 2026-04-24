@@ -6,6 +6,11 @@ export interface AppStatus {
   authEmail?: string;
   loginInProgress: boolean;
   port: number;
+  codexAliases: {
+    haiku: string;
+    sonnet: string;
+    opus: string;
+  };
 }
 
 export type UiLogLine = string;
@@ -16,6 +21,11 @@ contextBridge.exposeInMainWorld("api", {
   startProxy: (): Promise<void> => ipcRenderer.invoke("start-proxy"),
   stopProxy: (): Promise<void> => ipcRenderer.invoke("stop-proxy"),
   loginCodex: (): Promise<void> => ipcRenderer.invoke("login-codex"),
+  setCodexAliases: (aliases: {
+    haiku?: string;
+    sonnet?: string;
+    opus?: string;
+  }): Promise<void> => ipcRenderer.invoke("set-codex-aliases", aliases),
   minimizeToTray: (): void => ipcRenderer.send("minimize-to-tray"),
   onStatusUpdate: (cb: (s: AppStatus) => void): void => {
     ipcRenderer.on("status-update", (_event, data: AppStatus) => cb(data));
