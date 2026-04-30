@@ -5,6 +5,7 @@ export interface AppStatus {
   authValid: boolean;
   authEmail?: string;
   loginInProgress: boolean;
+  logoutInProgress: boolean;
   port: number;
   codexAliases: {
     haiku: string;
@@ -21,6 +22,7 @@ contextBridge.exposeInMainWorld("api", {
   startProxy: (): Promise<void> => ipcRenderer.invoke("start-proxy"),
   stopProxy: (): Promise<void> => ipcRenderer.invoke("stop-proxy"),
   loginCodex: (): Promise<void> => ipcRenderer.invoke("login-codex"),
+  logoutCodex: (): Promise<void> => ipcRenderer.invoke("logout-codex"),
   setCodexAliases: (aliases: {
     haiku?: string;
     sonnet?: string;

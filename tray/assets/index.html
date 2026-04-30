@@ -72,7 +72,8 @@
     }
 
     .auth-card .hint-box,
-    .auth-card #login-btn {
+    .auth-card #login-btn,
+    .auth-card #logout-btn {
       margin-top: 12px;
     }
 
@@ -261,6 +262,9 @@
       <button class="btn primary" id="login-btn" onclick="loginCodex()" style="display:none">
         Sign in
       </button>
+      <button class="btn secondary" id="logout-btn" onclick="logoutCodex()" style="display:none">
+        Sign out
+      </button>
     </div>
 
     <!-- Proxy card -->
@@ -381,6 +385,7 @@
         const authText = document.getElementById('auth-text');
         const authSub  = document.getElementById('auth-sub');
         const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
         const loginHint = document.getElementById('login-hint');
 
         const proxyDot  = document.getElementById('proxy-dot');
@@ -392,6 +397,7 @@
         authText.textContent = 'Cannot update';
         authSub.textContent = message;
         loginBtn.style.display = 'none';
+        logoutBtn.style.display = 'none';
         loginHint.style.display = 'none';
 
         proxyDot.className = 'dot off';
@@ -444,6 +450,7 @@
       const authText = document.getElementById('auth-text');
       const authSub  = document.getElementById('auth-sub');
       const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
       const loginHint = document.getElementById('login-hint');
 
       if (s.loginInProgress) {
@@ -451,18 +458,28 @@
         authText.textContent = 'Signing in...';
         authSub.textContent  = 'Complete in browser';
         loginBtn.style.display  = 'none';
+        logoutBtn.style.display = 'none';
         loginHint.style.display = 'block';
+      } else if (s.logoutInProgress) {
+        authDot.className = 'dot busy';
+        authText.textContent = 'Signing out...';
+        authSub.textContent  = 'Clearing Codex credentials';
+        loginBtn.style.display  = 'none';
+        logoutBtn.style.display = 'none';
+        loginHint.style.display = 'none';
       } else if (s.authValid) {
         authDot.className = 'dot on';
         authText.textContent = 'Signed in';
         authSub.textContent  = s.authEmail || 'Codex / ChatGPT';
         loginBtn.style.display  = 'none';
+        logoutBtn.style.display = 'inline-flex';
         loginHint.style.display = 'none';
       } else {
         authDot.className = 'dot off';
         authText.textContent = 'Not signed in';
         authSub.textContent  = 'Sign in to use Codex';
         loginBtn.style.display  = 'inline-flex';
+        logoutBtn.style.display = 'none';
         loginHint.style.display = 'none';
       }
 
@@ -493,6 +510,14 @@
           return;
         }
         await api.loginCodex();
+      };
+
+      window.logoutCodex = async function logoutCodex() {
+        if (!api || typeof api.logoutCodex !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        await api.logoutCodex();
       };
 
       window.updateMapping = async function updateMapping() {
