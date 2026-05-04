@@ -14,10 +14,10 @@ const PROXY_ENV_KEYS = [
 ] as const;
 
 const CODEX_ALLOWED_UPSTREAM_MODELS = [
-  "gpt-5.2",
   "gpt-5.3-codex",
   "gpt-5.4",
   "gpt-5.4-mini",
+  "gpt-5.5",
 ] as const;
 
 export type CodexAllowedUpstreamModel = (typeof CODEX_ALLOWED_UPSTREAM_MODELS)[number];
@@ -31,7 +31,7 @@ export type CodexAliases = {
 export const DEFAULT_CODEX_ALIASES: CodexAliases = {
   haiku: "gpt-5.4-mini",
   sonnet: "gpt-5.4",
-  opus: "gpt-5.2",
+  opus: "gpt-5.5",
 };
 
 const CODEX_ALIAS_KEYS = {

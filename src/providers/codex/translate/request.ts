@@ -15,6 +15,7 @@ export interface ResponsesRequest {
   model: string
   instructions?: string
   input: ResponsesInputItem[]
+  max_output_tokens?: number
   tools?: ResponsesTool[]
   tool_choice?:
     | "auto"
@@ -40,6 +41,10 @@ export interface ResponsesRequest {
 
 type OpenAIReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh"
 type OutputEffort = NonNullable<AnthropicRequest["output_config"]>["effort"]
+
+const MODEL_MAX_OUTPUT_TOKENS = new Map<string, number>([
+  ["gpt-5.5", 128_000],
+])
 
 export type ResponsesInputItem =
   | {
@@ -134,6 +139,8 @@ export function translateRequest(req: AnthropicRequest, opts: TranslateOptions =
     text,
   }
   if (instructions) out.instructions = instructions
+  const maxOutputTokens = MODEL_MAX_OUTPUT_TOKENS.get(req.model)
+  if (maxOutputTokens) out.max_output_tokens = maxOutputTokens
   if (tools && tools.length) out.tools = tools
   if (opts.sessionId) out.prompt_cache_key = opts.sessionId
   const effort = mapOpenAIReasoningEffort(req.output_config?.effort)

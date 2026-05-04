@@ -45,6 +45,16 @@ describe("translateRequest", () => {
     expect(translated.include).toBeUndefined()
   })
 
+  it("uses the gpt-5.5 max output token limit", () => {
+    const translated = translateRequest({
+      ...baseRequest,
+      model: "gpt-5.5",
+      max_tokens: 32000,
+    })
+
+    expect(translated.max_output_tokens).toBe(128000)
+  })
+
   it("returns only the expected top-level upstream request fields", () => {
     const translated = translateRequest({
       ...baseRequest,
