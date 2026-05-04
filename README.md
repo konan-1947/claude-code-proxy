@@ -88,23 +88,23 @@ upstream for each request is chosen from `ANTHROPIC_MODEL`.
 
 `ANTHROPIC_MODEL` selects the provider:
 
-- `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini`, `gpt-5.2` → **codex**
+- `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex` → **codex**
 - `kimi-for-coding`, `kimi-k2.6`, `k2.6` → **kimi**
 
 An unknown model returns a 400 listing the supported ids. There is no
 implicit default provider.
 
 Claude Code also issues background requests (session title generation, token
-counts) against its built-in "small/fast" haiku model id. Those requests
-would 400 because no provider claims it, so set
-`ANTHROPIC_SMALL_FAST_MODEL` to a concrete id too (the same value as
-`ANTHROPIC_MODEL` is usually fine):
+counts) against its built-in "small/fast" haiku model id. Set
+`ANTHROPIC_SMALL_FAST_MODEL` to a concrete provider-owned id too so those
+requests route to the provider you intend to use (`ANTHROPIC_MODEL` is usually
+fine for Kimi; Codex setups typically want `gpt-5.4-mini`):
 
 ```sh
 # Codex
 ANTHROPIC_BASE_URL=http://localhost:18765 \
 ANTHROPIC_AUTH_TOKEN=unused \
-ANTHROPIC_MODEL=gpt-5.4 \
+ANTHROPIC_MODEL=gpt-5.5 \
 ANTHROPIC_SMALL_FAST_MODEL=gpt-5.4-mini \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   claude
@@ -125,7 +125,7 @@ Or set it persistently in `~/.claude/settings.json`:
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:18765",
     "ANTHROPIC_AUTH_TOKEN": "unused",
-    "ANTHROPIC_MODEL": "gpt-5.4",
+    "ANTHROPIC_MODEL": "gpt-5.5",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.4-mini",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
   }
@@ -144,7 +144,7 @@ Disable only automatic compaction while keeping manual `/compact` available:
 DISABLE_AUTO_COMPACT=1 \
 ANTHROPIC_BASE_URL=http://localhost:18765 \
 ANTHROPIC_AUTH_TOKEN=unused \
-ANTHROPIC_MODEL=gpt-5.4 \
+ANTHROPIC_MODEL=gpt-5.5 \
 ANTHROPIC_SMALL_FAST_MODEL=gpt-5.4-mini \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   claude
@@ -157,7 +157,7 @@ Or add it to `~/.claude/settings.json`:
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:18765",
     "ANTHROPIC_AUTH_TOKEN": "unused",
-    "ANTHROPIC_MODEL": "gpt-5.4",
+    "ANTHROPIC_MODEL": "gpt-5.5",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.4-mini",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
     "DISABLE_AUTO_COMPACT": 1
@@ -181,12 +181,9 @@ Upstream: `https://chatgpt.com/backend-api/codex/responses` (Responses API).
 Set `ANTHROPIC_MODEL` to a model your ChatGPT subscription is allowed to use.
 Confirmed working on **Plus**:
 
+- `gpt-5.5`
 - `gpt-5.4`
 - `gpt-5.3-codex`
-
-Also verified:
-
-- `gpt-5.2`
 - `gpt-5.4-mini`
 
 If the resolved model isn't supported by your account, upstream returns a 400
@@ -409,7 +406,7 @@ Settings are environment variables on the proxy process, not a config file.
 | `CCP_LOG_VERBOSE` | unset                            | Log full request/response bodies + every SSE event |
 | `KIMI_OAUTH_HOST` | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)        |
 | `KIMI_BASE_URL`   | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                       |
-| `CCP_CODEX_MODEL` | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
+| `CCP_CODEX_MODEL` | unset                            | Force all Codex requests to this model (`gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.5`) |
 | `CCP_CODEX_EFFORT`| unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`) |
 
 ### Files

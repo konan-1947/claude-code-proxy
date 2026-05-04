@@ -19,7 +19,7 @@ describe("resolveModel", () => {
   it("uses default aliases", () => {
     delete process.env.CCP_CODEX_MODEL
     delete process.env.CCP_CODEX_MODEL_ALIASES
-    expect(resolveModel("opus")).toBe("gpt-5.2")
+    expect(resolveModel("opus")).toBe("gpt-5.5")
   })
 
   it("allows per-alias overrides via CCP_CODEX_MODEL_ALIASES", () => {
@@ -35,16 +35,16 @@ describe("resolveModel", () => {
   it("ignores invalid JSON", () => {
     delete process.env.CCP_CODEX_MODEL
     process.env.CCP_CODEX_MODEL_ALIASES = "{"
-    expect(resolveModel("opus")).toBe("gpt-5.2")
+    expect(resolveModel("opus")).toBe("gpt-5.5")
   })
 
   it("ignores unknown keys and invalid values", () => {
     delete process.env.CCP_CODEX_MODEL
     process.env.CCP_CODEX_MODEL_ALIASES = JSON.stringify({
       random: "gpt-5.4",
-      opus: "gpt-4.1",
+      opus: "gpt-5.2",
     })
-    expect(resolveModel("opus")).toBe("gpt-5.2")
+    expect(resolveModel("opus")).toBe("gpt-5.5")
   })
 
   it("keeps CCP_CODEX_MODEL precedence", () => {

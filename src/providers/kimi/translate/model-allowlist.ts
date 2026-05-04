@@ -14,7 +14,12 @@ const ALIAS_TARGETS: Record<string, string> = {
   opus: KIMI_DEFAULT_MODEL,
   "claude-opus-4-7": KIMI_DEFAULT_MODEL,
   "kimi-for-coding": KIMI_DEFAULT_MODEL,
+  "kimi-k2.6": KIMI_DEFAULT_MODEL,
+  "k2.6": KIMI_DEFAULT_MODEL,
 }
+
+export const SUPPORTED_REQUEST_MODELS = new Set(Object.keys(ALIAS_TARGETS))
+export const PROVIDER_SUPPORTED_MODELS = Object.keys(ALIAS_TARGETS)
 
 export function resolveModel(model: string): string {
   return ALIAS_TARGETS[model] ?? KIMI_DEFAULT_MODEL

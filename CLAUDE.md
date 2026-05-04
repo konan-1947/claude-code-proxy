@@ -95,7 +95,7 @@ Claude Code (Anthropic Messages API)
 ```bash
 export ANTHROPIC_BASE_URL="http://127.0.0.1:18765"
 export ANTHROPIC_AUTH_TOKEN="unused"
-export ANTHROPIC_MODEL="gpt-5.4"               # or "kimi-for-coding"
+export ANTHROPIC_MODEL="gpt-5.5"               # or "kimi-for-coding"
 export ANTHROPIC_SMALL_FAST_MODEL="gpt-5.4-mini"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 ```

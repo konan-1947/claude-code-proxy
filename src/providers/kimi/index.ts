@@ -3,6 +3,7 @@ import type { AnthropicRequest } from "../../anthropic/schema.ts"
 import {
   assertAllowedModel,
   ModelNotAllowedError,
+  PROVIDER_SUPPORTED_MODELS,
   resolveModel,
 } from "./translate/model-allowlist.ts"
 import { translateRequest } from "./translate/request.ts"
@@ -200,18 +201,7 @@ const cli: CliHandlers = {
 
 export const kimiProvider: Provider = {
   name: "kimi",
-  supportedModels: new Set([
-    "kimi-for-coding",
-    "kimi-k2.6",
-    "k2.6",
-    "haiku",
-    "claude-haiku-4-5",
-    "claude-haiku-4-5-20251001",
-    "sonnet",
-    "claude-sonnet-4-6",
-    "opus",
-    "claude-opus-4-7",
-  ]),
+  supportedModels: new Set(PROVIDER_SUPPORTED_MODELS),
   handleMessages,
   handleCountTokens,
   cli,

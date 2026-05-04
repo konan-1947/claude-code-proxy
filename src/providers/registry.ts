@@ -25,10 +25,10 @@ export function allProviders(): Provider[] {
   return Object.values(PROVIDERS)
 }
 
-// Look up the single provider that claims the given model id. Returns
+// Look up the first provider that claims the given request model id. Returns
 // undefined when no provider declares it (the caller should surface an
-// error). Cross-provider aliases like `haiku` / `sonnet` are deliberately
-// NOT resolvable here — users must use a concrete, provider-owned model id.
+// error). Providers may claim shared aliases like `haiku` / `sonnet`, so
+// user-facing docs should prefer concrete, provider-owned model ids.
 export function providerForModel(model: string): Provider | undefined {
   for (const p of allProviders()) {
     if (p.supportedModels.has(model)) return p

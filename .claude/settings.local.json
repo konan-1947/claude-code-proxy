@@ -27,7 +27,12 @@
       "Bash(cygpath *)",
       "Skill(claude-api)",
       "Skill(update-config)",
-      "Bash(bun test *)"
+      "Bash(bun test *)",
+      "WebSearch",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:openai.com)",
+      "WebFetch(domain:help.openai.com)",
+      "WebFetch(domain:developers.openai.com)"
     ]
   }
 }

@@ -59,22 +59,7 @@ function parseCodexAliasEnv(raw: string | undefined): Record<string, unknown> {
 }
 
 const CODEX_SPINNER_VERBS = [
-  "Hello ae, chào mừng ae đến với Trực Tiếp Game",
-  "Hello ae, chào mừng ae đến với Gián Tiếp Game",
-  "Anh em có giật lag gì không?",
-  "F5 đi anh em",
-  "Gái gú là phù du, trực tiếp game là bất diệt",
-  "Từ game kinh dị thành game hài",
-  "Con game này chỉ dành cho trẻ con",
-  "Game này chó chơi à",
-  "Ae đợi tôi tí",
-  "Học sinh cấp 3 sao giờ này còn coi anh chơi game? Đi ngủ nhanh đi em",
-  "Trên thế giới này có 7 tỷ người, không có người này thì có người khác",
-  "Địt con mẹ cuộc đời",
-  "Tao là bố chúng mày. Chúng mày là con tao",
-  "Alo Vũ à Vũ",
-  "Sợ quá, sợ quá, phải ban nó thôi",
-  "Khó hiểu vailon nhề",
+  ""
 ] as const;
 
 type SettingsJson = {

@@ -23,7 +23,7 @@
     "appId": "com.claude-code-proxy.tray",
     "productName": "Claude Proxy Tray",
     "files": [
-      "dist/**/*",
+      "dist/*.js",
       "assets/**/*"
     ],
     "win": {
