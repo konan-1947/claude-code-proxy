@@ -13,49 +13,187 @@ const PROXY_ENV_KEYS = [
   "CCP_CODEX_MODEL_ALIASES",
 ] as const;
 
-const CODEX_ALLOWED_UPSTREAM_MODELS = [
-  "gpt-5.3-codex",
+const CODEX_TARGET_MODEL_SUGGESTIONS = [
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5",
+  "gpt-5.2",
   "gpt-5.4",
   "gpt-5.4-mini",
-  "gpt-5.5",
 ] as const;
 
-export type CodexAllowedUpstreamModel = (typeof CODEX_ALLOWED_UPSTREAM_MODELS)[number];
+export type CodexAliases = Record<string, string>;
 
-export type CodexAliases = {
-  haiku: CodexAllowedUpstreamModel;
-  sonnet: CodexAllowedUpstreamModel;
-  opus: CodexAllowedUpstreamModel;
+export type CodexAdvancedSettings = {
+  anthropicModel: string;
+  anthropicSmallFastModel: string;
 };
 
 export const DEFAULT_CODEX_ALIASES: CodexAliases = {
   haiku: "gpt-5.4-mini",
+  "claude-haiku-4-5": "gpt-5.4-mini",
+  "claude-haiku-4-5-20251001": "gpt-5.4-mini",
   sonnet: "gpt-5.4",
+  "claude-sonnet-4-6": "gpt-5.4",
+  "claude-sonnet-5": "gpt-5.4",
+  "sonnet[1m]": "gpt-5.4",
+  best: "gpt-5.4",
+  fable: "gpt-5.4",
+  "claude-fable-5": "gpt-5.4",
   opus: "gpt-5.5",
+  "claude-opus-4-7": "gpt-5.5",
+  "claude-opus-4-8": "gpt-5.5",
+  "opus[1m]": "gpt-5.5",
+  opusplan: "gpt-5.5",
 };
 
-const CODEX_ALIAS_KEYS = {
-  haiku: ["haiku", "claude-haiku-4-5", "claude-haiku-4-5-20251001"],
-  sonnet: ["sonnet", "claude-sonnet-4-6"],
-  opus: ["opus", "claude-opus-4-7"],
-} as const;
+export const DEFAULT_CODEX_ADVANCED: CodexAdvancedSettings = {
+  anthropicModel: "sonnet",
+  anthropicSmallFastModel: "haiku",
+};
 
-function isAllowedUpstreamModel(x: unknown): x is CodexAllowedUpstreamModel {
-  return (
-    typeof x === "string" &&
-    (CODEX_ALLOWED_UPSTREAM_MODELS as readonly string[]).includes(x)
-  );
-}
-
-function parseCodexAliasEnv(raw: string | undefined): Record<string, unknown> {
+function parseCodexAliasEnv(raw: string | undefined): CodexAliases | undefined {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const out: CodexAliases = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value !== "string") continue;
+      if (key.trim() === "" || value.trim() === "") continue;
+      out[key] = value;
+    }
+    return out;
   } catch {
-    return {};
+    return undefined;
   }
+}
+
+function normalizeAliases(next: Record<string, unknown>): CodexAliases {
+  const out: CodexAliases = {};
+  for (const [key, value] of Object.entries(next)) {
+    if (typeof value !== "string") continue;
+    const k = key.trim();
+    const v = value.trim();
+    if (!k || !v) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function stripTomlComment(line: string): string {
+  let inDouble = false;
+  let inSingle = false;
+  let escaped = false;
+  let out = "";
+
+  for (const ch of line) {
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && inDouble) {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === "\"" && !inSingle) inDouble = !inDouble;
+    else if (ch === "'" && !inDouble) inSingle = !inSingle;
+    else if (ch === "#" && !inDouble && !inSingle) break;
+    out += ch;
+  }
+
+  return out.trim();
+}
+
+function splitTomlAssignment(line: string): [string, string] | undefined {
+  let inDouble = false;
+  let inSingle = false;
+  let escaped = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && inDouble) {
+      escaped = true;
+      continue;
+    }
+    if (ch === "\"" && !inSingle) inDouble = !inDouble;
+    else if (ch === "'" && !inDouble) inSingle = !inSingle;
+    else if (ch === "=" && !inDouble && !inSingle) {
+      return [line.slice(0, i).trim(), line.slice(i + 1).trim()];
+    }
+  }
+
+  return undefined;
+}
+
+function parseTomlString(raw: string): string | undefined {
+  const value = raw.trim();
+  if (value.startsWith("\"") && value.endsWith("\"")) {
+    try {
+      return JSON.parse(value) as string;
+    } catch {
+      return undefined;
+    }
+  }
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
+  }
+  return value || undefined;
+}
+
+function parseTomlKey(raw: string): string | undefined {
+  const key = raw.trim();
+  if (key.startsWith("\"") || key.startsWith("'")) return parseTomlString(key);
+  return /^[A-Za-z0-9_-]+$/.test(key) ? key : undefined;
+}
+
+function isAliasSection(section: string | undefined): boolean {
+  return (
+    section === undefined ||
+    section === "mapping" ||
+    section === "aliases" ||
+    section === "codex.aliases" ||
+    section === "CCP_CODEX_MODEL_ALIASES"
+  );
+}
+
+export function parseCodexMappingToml(raw: string): CodexAliases {
+  const out: CodexAliases = {};
+  let section: string | undefined;
+
+  for (const originalLine of raw.split(/\r?\n/)) {
+    const line = stripTomlComment(originalLine);
+    if (!line) continue;
+
+    const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      section = sectionMatch[1]?.trim();
+      continue;
+    }
+
+    if (!isAliasSection(section)) continue;
+
+    const assignment = splitTomlAssignment(line);
+    if (!assignment) continue;
+    const [rawKey, rawValue] = assignment;
+    const key = parseTomlKey(rawKey);
+    const value = parseTomlString(rawValue);
+    if (!key || !value) continue;
+    out[key] = value;
+  }
+
+  return normalizeAliases(out);
+}
+
+function stringOrDefault(value: string | undefined, fallback: string): string {
+  return value && value.trim() ? value : fallback;
 }
 
 const CODEX_SPINNER_VERBS = [
@@ -93,58 +231,71 @@ export function getClaudeEnv(): Record<string, string> {
 
 export function getCodexAliases(): CodexAliases {
   const settings = readSettings();
-  const parsed = parseCodexAliasEnv(settings.env?.["CCP_CODEX_MODEL_ALIASES"]);
-
-  const out: CodexAliases = { ...DEFAULT_CODEX_ALIASES };
-  for (const [alias, keys] of Object.entries(CODEX_ALIAS_KEYS)) {
-    for (const key of keys) {
-      const v = parsed[key];
-      if (isAllowedUpstreamModel(v)) {
-        out[alias as keyof CodexAliases] = v;
-        break;
-      }
-    }
-  }
-  return out;
+  const raw = settings.env?.["CCP_CODEX_MODEL_ALIASES"];
+  if (raw === undefined || raw === "") return { ...DEFAULT_CODEX_ALIASES };
+  const parsed = parseCodexAliasEnv(raw);
+  return parsed ?? { ...DEFAULT_CODEX_ALIASES };
 }
 
-export function setCodexAliases(next: Partial<CodexAliases>): void {
+export function setCodexAliases(next: Record<string, unknown>): void {
   const settings = readSettings();
-  const current = getCodexAliases();
-  const merged: CodexAliases = {
-    haiku: next.haiku ?? current.haiku,
-    sonnet: next.sonnet ?? current.sonnet,
-    opus: next.opus ?? current.opus,
-  };
-
   if (!settings.env) settings.env = {};
-
-  const envObj: Record<string, string> = {};
-  for (const [alias, keys] of Object.entries(CODEX_ALIAS_KEYS)) {
-    const value = merged[alias as keyof CodexAliases];
-    for (const k of keys) envObj[k] = value;
-  }
-
-  settings.env["CCP_CODEX_MODEL_ALIASES"] = JSON.stringify(envObj);
+  settings.env["CCP_CODEX_MODEL_ALIASES"] = JSON.stringify(normalizeAliases(next));
   writeSettings(settings);
 }
 
-export function isCodexAllowedUpstreamModel(x: unknown): x is CodexAllowedUpstreamModel {
-  return isAllowedUpstreamModel(x);
+export function importCodexAliasesFromTomlFile(filePath: string): CodexAliases {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const aliases = parseCodexMappingToml(raw);
+  if (Object.keys(aliases).length === 0) {
+    throw new Error("No valid mappings found in TOML file");
+  }
+  setCodexAliases(aliases);
+  return aliases;
 }
 
-export function codexAllowedUpstreamModels(): readonly CodexAllowedUpstreamModel[] {
-  return CODEX_ALLOWED_UPSTREAM_MODELS;
+export function getCodexAdvancedSettings(): CodexAdvancedSettings {
+  const settings = readSettings();
+  return {
+    anthropicModel: stringOrDefault(
+      settings.env?.["ANTHROPIC_MODEL"],
+      DEFAULT_CODEX_ADVANCED.anthropicModel,
+    ),
+    anthropicSmallFastModel: stringOrDefault(
+      settings.env?.["ANTHROPIC_SMALL_FAST_MODEL"],
+      DEFAULT_CODEX_ADVANCED.anthropicSmallFastModel,
+    ),
+  };
+}
+
+export function setCodexAdvancedSettings(next: Partial<CodexAdvancedSettings>): void {
+  const settings = readSettings();
+  const current = getCodexAdvancedSettings();
+  if (!settings.env) settings.env = {};
+  settings.env["ANTHROPIC_MODEL"] = stringOrDefault(
+    next.anthropicModel,
+    current.anthropicModel,
+  );
+  settings.env["ANTHROPIC_SMALL_FAST_MODEL"] = stringOrDefault(
+    next.anthropicSmallFastModel,
+    current.anthropicSmallFastModel,
+  );
+  writeSettings(settings);
+}
+
+export function codexTargetModelSuggestions(): readonly string[] {
+  return CODEX_TARGET_MODEL_SUGGESTIONS;
 }
 
 export function enableCodexMode(port: number = 18765): void {
   const settings = readSettings();
+  const advanced = getCodexAdvancedSettings();
   settings.env = {
     ...(settings.env ?? {}),
     ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
     ANTHROPIC_AUTH_TOKEN: "unused",
-    ANTHROPIC_MODEL: "gpt-5.4",
-    ANTHROPIC_SMALL_FAST_MODEL: "gpt-5.4-mini",
+    ANTHROPIC_MODEL: advanced.anthropicModel,
+    ANTHROPIC_SMALL_FAST_MODEL: advanced.anthropicSmallFastModel,
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
   };
   settings.spinnerVerbs = {

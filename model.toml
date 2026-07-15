@@ -1,0 +1,8 @@
+[mapping]
+  sonnet = "gpt-5.6-sol"
+  "sonnet[1m]" = "gpt-5.6-sol"
+  opus = "gpt-5.6-sol"
+  "opus[1m]" = "gpt-5.6-sol"
+  fable = "gpt-5.6-sol"
+  best = "gpt-5.6-sol"
+  haiku = "gpt-5.4-mini"

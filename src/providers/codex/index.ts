@@ -1,10 +1,7 @@
 import type { AnthropicRequest } from "../../anthropic/schema.ts"
 import type { Provider, RequestContext, CliHandlers } from "../types.ts"
 import {
-  ALLOWED_MODELS,
-  MODEL_ALIASES,
-  assertAllowedModel,
-  ModelNotAllowedError,
+  routableCodexModels,
   resolveModel,
 } from "./translate/model-allowlist.ts"
 import { translateRequest } from "./translate/request.ts"
@@ -145,19 +142,6 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
   if (VERBOSE) log.debug("anthropic request body", { body })
 
   const resolvedModel = resolveModel(body.model)
-
-  try {
-    assertAllowedModel(resolvedModel)
-  } catch (err) {
-    if (err instanceof ModelNotAllowedError) {
-      return jsonError(
-        400,
-        "invalid_request_error",
-        `Model "${body.model}" resolves to unsupported model "${err.model}"`,
-      )
-    }
-    throw err
-  }
 
   const translated = translateRequest({ ...body, model: resolvedModel }, { sessionId: ctx.sessionId })
   const localInputTokens = VERBOSE ? countTokens(body) : undefined
@@ -364,7 +348,7 @@ const cli: CliHandlers = {
 
 export const codexProvider: Provider = {
   name: "codex",
-  supportedModels: new Set([...ALLOWED_MODELS, ...MODEL_ALIASES.keys()]),
+  supportedModels: routableCodexModels(),
   handleMessages,
   handleCountTokens,
   cli,

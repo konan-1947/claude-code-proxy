@@ -1,8 +1,12 @@
-export const ALLOWED_MODELS = new Set([
+export const CODEX_MODEL_SUGGESTIONS = new Set([
   "gpt-5.3-codex",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
   "gpt-5.4",
   "gpt-5.4-mini",
   "gpt-5.5",
+  "gpt-5.2",
 ])
 
 export const MODEL_ALIASES = new Map<string, string>([
@@ -11,15 +15,21 @@ export const MODEL_ALIASES = new Map<string, string>([
   ["claude-haiku-4-5-20251001", "gpt-5.4-mini"],
   ["sonnet", "gpt-5.4"],
   ["claude-sonnet-4-6", "gpt-5.4"],
+  ["claude-sonnet-5", "gpt-5.4"],
+  ["sonnet[1m]", "gpt-5.4"],
+  ["best", "gpt-5.4"],
+  ["fable", "gpt-5.4"],
+  ["claude-fable-5", "gpt-5.4"],
   ["opus", "gpt-5.5"],
   ["claude-opus-4-7", "gpt-5.5"],
+  ["claude-opus-4-8", "gpt-5.5"],
+  ["opus[1m]", "gpt-5.5"],
+  ["opusplan", "gpt-5.5"],
 ])
-
-const KNOWN_ALIAS_KEYS = new Set([...MODEL_ALIASES.keys()])
 
 type AliasOverrides = Record<string, string>
 
-function parseAliasOverrides(raw: string | undefined): AliasOverrides {
+export function parseAliasOverrides(raw: string | undefined): AliasOverrides {
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw) as unknown
@@ -27,10 +37,11 @@ function parseAliasOverrides(raw: string | undefined): AliasOverrides {
 
     const out: AliasOverrides = {}
     for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!KNOWN_ALIAS_KEYS.has(k)) continue
       if (typeof v !== "string") continue
-      if (!ALLOWED_MODELS.has(v)) continue
-      out[k] = v
+      const key = k.trim()
+      const value = v.trim()
+      if (key === "" || value === "") continue
+      out[key] = value
     }
     return out
   } catch {
@@ -53,15 +64,10 @@ export function resolveModel(model: string): string {
   return overrides[model] ?? MODEL_ALIASES.get(model) ?? model
 }
 
-export function assertAllowedModel(model: string): void {
-  if (!ALLOWED_MODELS.has(model)) {
-    throw new ModelNotAllowedError(model)
-  }
-}
-
-export class ModelNotAllowedError extends Error {
-  constructor(public model: string) {
-    super(`Model not allowed: ${model}`)
-    this.name = "ModelNotAllowedError"
-  }
+export function routableCodexModels(): Set<string> {
+  return new Set([
+    ...CODEX_MODEL_SUGGESTIONS,
+    ...MODEL_ALIASES.keys(),
+    ...Object.keys(parseAliasOverrides(process.env.CCP_CODEX_MODEL_ALIASES)),
+  ])
 }

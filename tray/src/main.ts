@@ -1,4 +1,4 @@
-import { app, Tray, Menu, shell, BrowserWindow, ipcMain } from "electron";
+import { app, Tray, Menu, shell, BrowserWindow, ipcMain, dialog } from "electron";
 import * as path from "path";
 import * as os from "os";
 import * as http from "http";
@@ -9,8 +9,10 @@ import { ProxyManager } from "./proxy";
 import {
   enableCodexMode,
   enableDirectMode,
+  getCodexAdvancedSettings,
   getCodexAliases,
-  isCodexAllowedUpstreamModel,
+  importCodexAliasesFromTomlFile,
+  setCodexAdvancedSettings,
   setCodexAliases,
 } from "./settings";
 
@@ -53,6 +55,7 @@ let mainWindow: BrowserWindow | null = null;
 const proxy = new ProxyManager();
 let loginInProgress = false;
 let logoutInProgress = false;
+let activeLoginCancel: (() => void) | null = null;
 
 // ---- UI logging --------------------------------------------------------
 
@@ -239,6 +242,7 @@ function getStatus() {
     logoutInProgress,
     port: PORT,
     codexAliases: getCodexAliases(),
+    codexAdvanced: getCodexAdvancedSettings(),
   };
 }
 
@@ -264,6 +268,20 @@ function createSplashWindow(): BrowserWindow {
 function pushStatusUpdate(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("status-update", getStatus());
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForProxyStopped(timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (proxy.status !== "stopped" && Date.now() < deadline) {
+    await sleep(100);
+  }
+  if (proxy.status !== "stopped") {
+    throw new Error("Timed out waiting for proxy to stop");
   }
 }
 
@@ -442,8 +460,10 @@ function startLogin(): Promise<void> {
       server.close();
       server.closeAllConnections?.();
       loginInProgress = false;
+      activeLoginCancel = null;
       if (err) {
-        pushUiLog(`[user action] ${new Date().toISOString()} login error ${safeJson({ provider: "codex", err: err.message })}`);
+        const action = err.name === "LoginCanceledError" ? "login canceled" : "login error";
+        pushUiLog(`[user action] ${new Date().toISOString()} ${action} ${safeJson({ provider: "codex", err: err.message })}`);
       } else {
         pushUiLog(`[user action] ${new Date().toISOString()} login success ${safeJson({ provider: "codex" })}`);
       }
@@ -486,6 +506,12 @@ function startLogin(): Promise<void> {
       finish(err instanceof Error ? err : new Error(String(err)));
     });
 
+    activeLoginCancel = () => {
+      const err = new Error("Login canceled");
+      err.name = "LoginCanceledError";
+      finish(err);
+    };
+
     server.listen(CODEX_OAUTH_PORT, () => {
       const authUrl = buildAuthorizeUrl(challenge, state);
       pushUiLog(`[user action] ${new Date().toISOString()} opening browser ${safeJson({ url: `${CODEX_ISSUER}/oauth/authorize?...` })}`);
@@ -496,6 +522,13 @@ function startLogin(): Promise<void> {
 
     timeout = setTimeout(() => finish(new Error("OAuth timeout")), 5 * 60 * 1000);
   });
+}
+
+function cancelLogin(): Promise<void> {
+  if (!loginInProgress || !activeLoginCancel) return Promise.resolve();
+  pushUiLog(`[user action] ${new Date().toISOString()} cancel login`);
+  activeLoginCancel();
+  return Promise.resolve();
 }
 
 function startLogout(): Promise<void> {
@@ -626,42 +659,56 @@ app.whenReady().then(() => {
     updateTray();
     pushStatusUpdate();
   });
-  ipcMain.handle("set-codex-aliases", (_event, next: { haiku?: string; sonnet?: string; opus?: string }) => {
-    const validated: Parameters<typeof setCodexAliases>[0] = {};
-
-    if (next.haiku !== undefined) {
-      if (!isCodexAllowedUpstreamModel(next.haiku)) {
-        throw new Error(`Invalid haiku model: ${next.haiku}`);
-      }
-      validated.haiku = next.haiku;
-    }
-
-    if (next.sonnet !== undefined) {
-      if (!isCodexAllowedUpstreamModel(next.sonnet)) {
-        throw new Error(`Invalid sonnet model: ${next.sonnet}`);
-      }
-      validated.sonnet = next.sonnet;
-    }
-
-    if (next.opus !== undefined) {
-      if (!isCodexAllowedUpstreamModel(next.opus)) {
-        throw new Error(`Invalid opus model: ${next.opus}`);
-      }
-      validated.opus = next.opus;
-    }
-
-    pushUiLog(`[user action] ${new Date().toISOString()} set codex aliases ${safeJson(validated)}`);
-    setCodexAliases(validated);
-
+  ipcMain.handle("restart-proxy", async () => {
+    pushUiLog(`[user action] ${new Date().toISOString()} restart proxy`);
     if (proxy.isRunning()) {
       proxy.stop();
-      enableCodexMode(PORT);
-      proxy.start();
-      updateTray();
+      await waitForProxyStopped(3000);
     }
+    enableCodexMode(PORT);
+    proxy.start();
+    updateTray();
+    pushStatusUpdate();
+  });
+  ipcMain.handle("set-codex-aliases", (_event, next: Record<string, unknown>) => {
+    pushUiLog(`[user action] ${new Date().toISOString()} set codex aliases ${safeJson(next)}`);
+    setCodexAliases(next);
+    pushStatusUpdate();
+  });
+  ipcMain.handle("import-codex-mapping", async () => {
+    pushUiLog(`[user action] ${new Date().toISOString()} import codex mapping start`);
+    const dialogOptions: Electron.OpenDialogOptions = {
+      title: "Import model mapping",
+      properties: ["openFile"],
+      filters: [
+        { name: "TOML", extensions: ["toml"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    };
+    const result =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showOpenDialog(mainWindow, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions);
+
+    if (result.canceled || !result.filePaths[0]) {
+      pushUiLog(`[user action] ${new Date().toISOString()} import codex mapping canceled`);
+      return { imported: false, count: 0 };
+    }
+
+    const filePath = result.filePaths[0];
+    const aliases = importCodexAliasesFromTomlFile(filePath);
+    const count = Object.keys(aliases).length;
+    pushUiLog(`[user action] ${new Date().toISOString()} import codex mapping success ${safeJson({ filePath, count })}`);
+    pushStatusUpdate();
+    return { imported: true, count, filePath };
+  });
+  ipcMain.handle("set-codex-advanced", (_event, next: { anthropicModel?: string; anthropicSmallFastModel?: string }) => {
+    pushUiLog(`[user action] ${new Date().toISOString()} set codex advanced ${safeJson(next)}`);
+    setCodexAdvancedSettings(next);
     pushStatusUpdate();
   });
   ipcMain.handle("login-codex", () => startLogin());
+  ipcMain.handle("cancel-login-codex", () => cancelLogin());
   ipcMain.handle("logout-codex", () => startLogout());
   ipcMain.on("minimize-to-tray", () => mainWindow?.hide());
 

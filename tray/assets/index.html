@@ -32,6 +32,7 @@
       max-width: 560px;
       margin: 0 auto;
       min-height: 0;
+      overflow: auto;
     }
 
     .row {
@@ -73,6 +74,7 @@
 
     .auth-card .hint-box,
     .auth-card #login-btn,
+    .auth-card #cancel-login-btn,
     .auth-card #logout-btn {
       margin-top: 12px;
     }
@@ -87,6 +89,13 @@
       align-items: center;
       gap: 10px;
       min-width: 0;
+    }
+
+    .proxy-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
     .dot {
@@ -170,18 +179,53 @@
 
     .mapping-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mapping-header {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #666666;
+      font-weight: 700;
+    }
+
+    .mapping-input {
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      text-align: left;
+    }
+
+    .mapping-remove {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .mapping-actions,
+    .advanced-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+
+    .advanced-card {
+      padding: 10px 16px 12px;
+    }
+
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
 
-    .mapping-field .sub-text {
+    .advanced-field .sub-text {
       margin: 0 0 4px;
-    }
-
-    .mapping-select {
-      width: 100%;
-      height: 34px;
-      padding: 0 28px 0 10px;
     }
 
     .logs-card {
@@ -262,6 +306,9 @@
       <button class="btn primary" id="login-btn" onclick="loginCodex()" style="display:none">
         Sign in
       </button>
+      <button class="btn secondary" id="cancel-login-btn" onclick="cancelLoginCodex()" style="display:none">
+        Stop
+      </button>
       <button class="btn secondary" id="logout-btn" onclick="logoutCodex()" style="display:none">
         Sign out
       </button>
@@ -278,7 +325,10 @@
             <div class="sub-text"   id="proxy-sub"></div>
           </div>
         </div>
-        <button class="btn" id="proxy-btn" onclick="toggleProxy()">...</button>
+        <div class="proxy-actions">
+          <button class="btn secondary" id="restart-btn" onclick="restartProxy()">Restart</button>
+          <button class="btn" id="proxy-btn" onclick="toggleProxy()">...</button>
+        </div>
       </div>
     </div>
 
@@ -288,22 +338,50 @@
     <div class="card mapping-card">
       <div class="mapping-head">
         <div class="card-label">Model mapping</div>
-        <div class="sub-text mapping-note">Changing mapping restarts proxy</div>
+        <div class="sub-text mapping-note">Restart proxy to apply changes</div>
       </div>
 
-      <div class="mapping-grid">
-        <div class="mapping-field">
-          <div class="sub-text">Haiku</div>
-          <select id="map-haiku" class="btn mapping-select" onchange="updateMapping()"></select>
+      <datalist id="codex-model-options">
+        <option value="gpt-5.6-sol"></option>
+        <option value="gpt-5.6-terra"></option>
+        <option value="gpt-5.6-luna"></option>
+        <option value="gpt-5.5"></option>
+        <option value="gpt-5.2"></option>
+        <option value="gpt-5.4"></option>
+        <option value="gpt-5.4-mini"></option>
+      </datalist>
+
+      <div class="mapping-grid" id="mapping-grid">
+        <div class="mapping-header">Claude model/alias</div>
+        <div class="mapping-header">Codex target model</div>
+        <div></div>
+      </div>
+      <div class="mapping-actions">
+        <button class="btn secondary" id="import-mapping-btn" onclick="importMappingToml()">Import TOML</button>
+        <button class="btn secondary" id="save-mapping-btn" onclick="updateMapping()">Save mapping</button>
+        <button class="btn secondary" id="add-mapping-btn" onclick="addMappingRow()">Add mapping</button>
+      </div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="card advanced-card">
+      <div class="mapping-head">
+        <div class="card-label">Advanced</div>
+        <div class="sub-text mapping-note">Restart proxy to apply changes</div>
+      </div>
+
+      <div class="advanced-grid">
+        <div class="advanced-field">
+          <div class="sub-text">ANTHROPIC_MODEL</div>
+          <input id="advanced-anthropic-model" class="btn mapping-input" spellcheck="false" onkeydown="commitAdvancedOnEnter(event)">
         </div>
-        <div class="mapping-field">
-          <div class="sub-text">Sonnet</div>
-          <select id="map-sonnet" class="btn mapping-select" onchange="updateMapping()"></select>
+        <div class="advanced-field">
+          <div class="sub-text">ANTHROPIC_SMALL_FAST_MODEL</div>
+          <input id="advanced-small-fast-model" class="btn mapping-input" spellcheck="false" onkeydown="commitAdvancedOnEnter(event)">
         </div>
-        <div class="mapping-field">
-          <div class="sub-text">Opus</div>
-          <select id="map-opus" class="btn mapping-select" onchange="updateMapping()"></select>
-        </div>
+      </div>
+      <div class="advanced-actions">
+        <button class="btn secondary" id="save-advanced-btn" onclick="updateAdvanced()">Save advanced</button>
       </div>
     </div>
 
@@ -330,6 +408,10 @@
       const api = window.api;
       let currentStatus = null;
       let autoScrollLogs = true;
+      let proxyActionInProgress = false;
+      let proxyActionLabel = 'Working...';
+      let mappingSaveInProgress = false;
+      let advancedSaveInProgress = false;
       const logBox = document.getElementById('log-box');
       const logScrollBtn = document.getElementById('log-scroll-btn');
 
@@ -385,6 +467,7 @@
         const authText = document.getElementById('auth-text');
         const authSub  = document.getElementById('auth-sub');
         const loginBtn = document.getElementById('login-btn');
+        const cancelLoginBtn = document.getElementById('cancel-login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const loginHint = document.getElementById('login-hint');
 
@@ -392,11 +475,13 @@
         const proxyText = document.getElementById('proxy-text');
         const proxySub  = document.getElementById('proxy-sub');
         const proxyBtn  = document.getElementById('proxy-btn');
+        const restartBtn = document.getElementById('restart-btn');
 
         authDot.className = 'dot off';
         authText.textContent = 'Cannot update';
         authSub.textContent = message;
         loginBtn.style.display = 'none';
+        cancelLoginBtn.style.display = 'none';
         logoutBtn.style.display = 'none';
         loginHint.style.display = 'none';
 
@@ -405,6 +490,7 @@
         proxySub.textContent = message;
         proxyBtn.textContent = '...';
         proxyBtn.disabled = true;
+        if (restartBtn) restartBtn.disabled = true;
 
         appendLog(`UI error: ${message}`);
       }
@@ -413,43 +499,26 @@
         currentStatus = s;
 
       // --- Model mapping ---
-      const haikuSel = document.getElementById('map-haiku');
-      const sonnetSel = document.getElementById('map-sonnet');
-      const opusSel = document.getElementById('map-opus');
-      const options = [
-        { value: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
-        { value: 'gpt-5.4', label: 'gpt-5.4' },
-        { value: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
-        { value: 'gpt-5.5', label: 'gpt-5.5' },
-      ];
-
-      function fillSelect(sel, value) {
-        if (!sel) return;
-        if (!sel.__ccp_filled) {
-          sel.innerHTML = '';
-          for (const opt of options) {
-            const o = document.createElement('option');
-            o.value = opt.value;
-            o.textContent = opt.label;
-            sel.appendChild(o);
-          }
-          sel.__ccp_filled = true;
-        }
-        if (value) sel.value = String(value);
-      }
-
       if (s && s.codexAliases) {
-        fillSelect(haikuSel, s.codexAliases.haiku);
-        fillSelect(sonnetSel, s.codexAliases.sonnet);
-        fillSelect(opusSel, s.codexAliases.opus);
+        renderMappingRows(s.codexAliases);
       }
+      setMappingDisabled(mappingSaveInProgress);
 
+      // --- Advanced ---
+      const anthropicModelInput = document.getElementById('advanced-anthropic-model');
+      const smallFastInput = document.getElementById('advanced-small-fast-model');
+      if (s && s.codexAdvanced) {
+        fillInput(anthropicModelInput, s.codexAdvanced.anthropicModel);
+        fillInput(smallFastInput, s.codexAdvanced.anthropicSmallFastModel);
+      }
+      setAdvancedDisabled(advancedSaveInProgress);
 
       // --- Auth ---
       const authDot  = document.getElementById('auth-dot');
       const authText = document.getElementById('auth-text');
       const authSub  = document.getElementById('auth-sub');
       const loginBtn = document.getElementById('login-btn');
+      const cancelLoginBtn = document.getElementById('cancel-login-btn');
       const logoutBtn = document.getElementById('logout-btn');
       const loginHint = document.getElementById('login-hint');
 
@@ -458,6 +527,7 @@
         authText.textContent = 'Signing in...';
         authSub.textContent  = 'Complete in browser';
         loginBtn.style.display  = 'none';
+        cancelLoginBtn.style.display = 'inline-flex';
         logoutBtn.style.display = 'none';
         loginHint.style.display = 'block';
       } else if (s.logoutInProgress) {
@@ -465,6 +535,7 @@
         authText.textContent = 'Signing out...';
         authSub.textContent  = 'Clearing Codex credentials';
         loginBtn.style.display  = 'none';
+        cancelLoginBtn.style.display = 'none';
         logoutBtn.style.display = 'none';
         loginHint.style.display = 'none';
       } else if (s.authValid) {
@@ -472,6 +543,7 @@
         authText.textContent = 'Signed in';
         authSub.textContent  = s.authEmail || 'Codex / ChatGPT';
         loginBtn.style.display  = 'none';
+        cancelLoginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline-flex';
         loginHint.style.display = 'none';
       } else {
@@ -479,6 +551,7 @@
         authText.textContent = 'Not signed in';
         authSub.textContent  = 'Sign in to use Codex';
         loginBtn.style.display  = 'inline-flex';
+        cancelLoginBtn.style.display = 'none';
         logoutBtn.style.display = 'none';
         loginHint.style.display = 'none';
       }
@@ -488,21 +561,132 @@
       const proxyText = document.getElementById('proxy-text');
       const proxySub  = document.getElementById('proxy-sub');
       const proxyBtn  = document.getElementById('proxy-btn');
+      const restartBtn = document.getElementById('restart-btn');
 
-      if (s.proxyRunning) {
+      if (proxyActionInProgress) {
+        proxyDot.className = 'dot busy';
+        proxyText.textContent = proxyActionLabel;
+        proxySub.textContent  = String(s.port);
+        proxyBtn.textContent  = '...';
+        proxyBtn.className    = 'btn secondary';
+        proxyBtn.disabled     = true;
+        if (restartBtn) {
+          restartBtn.textContent = proxyActionLabel === 'Restarting...' ? 'Restarting...' : 'Restart';
+          restartBtn.disabled = true;
+        }
+      } else if (s.proxyRunning) {
         proxyDot.className = 'dot on';
         proxyText.textContent = 'Running';
         proxySub.textContent  = String(s.port);
         proxyBtn.textContent  = 'Stop';
         proxyBtn.className    = 'btn danger';
+        proxyBtn.disabled     = false;
+        if (restartBtn) {
+          restartBtn.textContent = 'Restart';
+          restartBtn.disabled = false;
+        }
       } else {
         proxyDot.className = 'dot off';
         proxyText.textContent = 'Stopped';
         proxySub.textContent  = String(s.port);
         proxyBtn.textContent  = 'Start';
         proxyBtn.className    = 'btn success';
+        proxyBtn.disabled     = false;
+        if (restartBtn) {
+          restartBtn.textContent = 'Restart';
+          restartBtn.disabled = false;
+        }
       }
     }
+
+      function fillInput(input, value) {
+        if (!input || document.activeElement === input) return;
+        input.value = value ? String(value) : '';
+      }
+
+      function renderMappingRows(aliases) {
+        const grid = document.getElementById('mapping-grid');
+        if (!grid || grid.dataset.editing === 'true') return;
+        const entries = Object.entries(aliases || {});
+        grid.innerHTML = [
+          '<div class="mapping-header">Claude model/alias</div>',
+          '<div class="mapping-header">Codex target model</div>',
+          '<div></div>',
+        ].join('');
+        for (const [alias, target] of entries) {
+          appendMappingRow(alias, target);
+        }
+      }
+
+      function appendMappingRow(alias, target) {
+        const grid = document.getElementById('mapping-grid');
+        if (!grid) return;
+
+        const aliasInput = document.createElement('input');
+        aliasInput.className = 'btn mapping-input mapping-alias-input';
+        aliasInput.spellcheck = false;
+        aliasInput.value = alias || '';
+        aliasInput.addEventListener('focus', () => { grid.dataset.editing = 'true'; });
+        aliasInput.addEventListener('keydown', (event) => window.commitMappingOnEnter(event));
+
+        const targetInput = document.createElement('input');
+        targetInput.className = 'btn mapping-input mapping-target-input';
+        targetInput.setAttribute('list', 'codex-model-options');
+        targetInput.spellcheck = false;
+        targetInput.value = target || '';
+        targetInput.addEventListener('focus', () => { grid.dataset.editing = 'true'; });
+        targetInput.addEventListener('keydown', (event) => window.commitMappingOnEnter(event));
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn secondary mapping-remove';
+        removeBtn.type = 'button';
+        removeBtn.textContent = '-';
+        removeBtn.title = 'Remove mapping';
+        removeBtn.addEventListener('click', () => {
+          aliasInput.remove();
+          targetInput.remove();
+          removeBtn.remove();
+          grid.dataset.editing = 'true';
+          window.updateMapping();
+        });
+
+        grid.appendChild(aliasInput);
+        grid.appendChild(targetInput);
+        grid.appendChild(removeBtn);
+      }
+
+      function setMappingDisabled(disabled) {
+        for (const input of document.querySelectorAll('.mapping-alias-input, .mapping-target-input')) {
+          input.disabled = !!disabled;
+        }
+        for (const id of ['add-mapping-btn', 'save-mapping-btn', 'import-mapping-btn']) {
+          const btn = document.getElementById(id);
+          if (btn) btn.disabled = !!disabled;
+        }
+        for (const btn of document.querySelectorAll('.mapping-remove')) {
+          btn.disabled = !!disabled;
+        }
+      }
+
+      function setAdvancedDisabled(disabled) {
+        for (const id of ['advanced-anthropic-model', 'advanced-small-fast-model', 'save-advanced-btn']) {
+          const el = document.getElementById(id);
+          if (el) el.disabled = !!disabled;
+        }
+      }
+
+      function collectMappingRows() {
+        const out = {};
+        const aliases = Array.from(document.querySelectorAll('.mapping-alias-input'));
+        const targets = Array.from(document.querySelectorAll('.mapping-target-input'));
+        for (let i = 0; i < aliases.length; i += 1) {
+          const alias = aliases[i] ? aliases[i].value.trim() : '';
+          const target = targets[i] ? targets[i].value.trim() : '';
+          if (!alias || !target) continue;
+          out[alias] = target;
+        }
+        return out;
+      }
 
       window.loginCodex = async function loginCodex() {
         if (!api || typeof api.loginCodex !== 'function') {
@@ -510,6 +694,15 @@
           return;
         }
         await api.loginCodex();
+      };
+
+      window.cancelLoginCodex = async function cancelLoginCodex() {
+        if (!api || typeof api.cancelLoginCodex !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        await api.cancelLoginCodex();
+        await refreshStatus();
       };
 
       window.logoutCodex = async function logoutCodex() {
@@ -525,14 +718,93 @@
           setCheckingError('IPC bridge unavailable (preload not loaded)');
           return;
         }
-        const haikuSel = document.getElementById('map-haiku');
-        const sonnetSel = document.getElementById('map-sonnet');
-        const opusSel = document.getElementById('map-opus');
-        await api.setCodexAliases({
-          haiku: haikuSel ? haikuSel.value : undefined,
-          sonnet: sonnetSel ? sonnetSel.value : undefined,
-          opus: opusSel ? opusSel.value : undefined,
-        });
+        if (mappingSaveInProgress) return;
+        mappingSaveInProgress = true;
+        setMappingDisabled(true);
+        try {
+          await api.setCodexAliases(collectMappingRows());
+          const grid = document.getElementById('mapping-grid');
+          if (grid) delete grid.dataset.editing;
+          await refreshStatus();
+        } catch (err) {
+          appendLog(`UI error: ${String(err)}`);
+          await refreshStatus();
+        } finally {
+          mappingSaveInProgress = false;
+          setMappingDisabled(false);
+        }
+      };
+
+      window.commitMappingOnEnter = function commitMappingOnEnter(event) {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        window.updateMapping();
+      };
+
+      window.addMappingRow = function addMappingRow() {
+        const grid = document.getElementById('mapping-grid');
+        if (grid) grid.dataset.editing = 'true';
+        appendMappingRow('', '');
+        setMappingDisabled(mappingSaveInProgress);
+        const inputs = document.querySelectorAll('.mapping-alias-input');
+        const last = inputs[inputs.length - 1];
+        if (last) last.focus();
+      };
+
+      window.importMappingToml = async function importMappingToml() {
+        if (!api || typeof api.importCodexMapping !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        if (mappingSaveInProgress) return;
+        mappingSaveInProgress = true;
+        setMappingDisabled(true);
+        try {
+          const result = await api.importCodexMapping();
+          const grid = document.getElementById('mapping-grid');
+          if (grid) delete grid.dataset.editing;
+          if (result && result.imported) {
+            appendLog(`Imported ${result.count} mapping rows from TOML`);
+          }
+          await refreshStatus();
+        } catch (err) {
+          appendLog(`UI error: ${String(err)}`);
+          await refreshStatus();
+        } finally {
+          mappingSaveInProgress = false;
+          setMappingDisabled(false);
+        }
+      };
+
+      window.updateAdvanced = async function updateAdvanced() {
+        if (!api || typeof api.setCodexAdvanced !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        if (advancedSaveInProgress) return;
+        const anthropicModelInput = document.getElementById('advanced-anthropic-model');
+        const smallFastInput = document.getElementById('advanced-small-fast-model');
+        advancedSaveInProgress = true;
+        setAdvancedDisabled(true);
+        try {
+          await api.setCodexAdvanced({
+            anthropicModel: anthropicModelInput ? anthropicModelInput.value.trim() : undefined,
+            anthropicSmallFastModel: smallFastInput ? smallFastInput.value.trim() : undefined,
+          });
+          await refreshStatus();
+        } catch (err) {
+          appendLog(`UI error: ${String(err)}`);
+          await refreshStatus();
+        } finally {
+          advancedSaveInProgress = false;
+          setAdvancedDisabled(false);
+        }
+      };
+
+      window.commitAdvancedOnEnter = function commitAdvancedOnEnter(event) {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        window.updateAdvanced();
       };
 
       window.toggleProxy = async function toggleProxy() {
@@ -540,10 +812,42 @@
           setCheckingError('IPC bridge unavailable (preload not loaded)');
           return;
         }
-        if (currentStatus && currentStatus.proxyRunning) {
-          await api.stopProxy();
-        } else {
-          await api.startProxy();
+        if (proxyActionInProgress) return;
+        proxyActionInProgress = true;
+        proxyActionLabel = currentStatus && currentStatus.proxyRunning ? 'Stopping...' : 'Starting...';
+        if (currentStatus) render(currentStatus);
+        try {
+          if (currentStatus && currentStatus.proxyRunning) {
+            await api.stopProxy();
+          } else {
+            await api.startProxy();
+          }
+          await refreshStatus();
+        } catch (err) {
+          appendLog(`UI error: ${String(err)}`);
+        } finally {
+          proxyActionInProgress = false;
+          if (currentStatus) render(currentStatus);
+        }
+      };
+
+      window.restartProxy = async function restartProxy() {
+        if (!api || typeof api.restartProxy !== 'function') {
+          setCheckingError('IPC bridge unavailable (preload not loaded)');
+          return;
+        }
+        if (proxyActionInProgress) return;
+        proxyActionInProgress = true;
+        proxyActionLabel = 'Restarting...';
+        if (currentStatus) render(currentStatus);
+        try {
+          await api.restartProxy();
+          await refreshStatus();
+        } catch (err) {
+          appendLog(`UI error: ${String(err)}`);
+        } finally {
+          proxyActionInProgress = false;
+          if (currentStatus) render(currentStatus);
         }
       };
 
